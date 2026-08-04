@@ -35,12 +35,20 @@ export const useAuthStore = create<AuthState>()(
 
 interface UIState {
   sidebarOpen: boolean;
+  mobileOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
+  setMobileOpen: (open: boolean) => void;
+  toggleMobile: () => void;
+  closeMobile: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   sidebarOpen: true,
+  mobileOpen: false,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  setMobileOpen: (open) => set({ mobileOpen: open }),
+  toggleMobile: () => set((s) => ({ mobileOpen: !s.mobileOpen })),
+  closeMobile: () => set({ mobileOpen: false }),
 }));

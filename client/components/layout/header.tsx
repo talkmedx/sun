@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 export function Header() {
   const { theme, setTheme } = useTheme();
   const { user, clearAuth } = useAuthStore();
-  const { toggleSidebar } = useUIStore();
+  const { toggleMobile } = useUIStore();
   const router = useRouter();
 
   async function handleLogout() {
@@ -28,9 +28,13 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl md:px-6">
-      <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar}>
+      <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleMobile}>
         <Menu className="h-5 w-5" />
       </Button>
+
+      <div className="flex items-center gap-2 md:hidden">
+        <span className="font-display text-sm font-semibold tracking-tight">Komal&apos;s Makeovers</span>
+      </div>
 
       <div className="relative hidden max-w-sm flex-1 md:block">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
