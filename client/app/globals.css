@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 98%;
+    --foreground: 220 30% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 12%;
+    --primary: 340 65% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 20% 94%;
+    --secondary-foreground: 220 25% 20%;
+    --muted: 40 15% 95%;
+    --muted-foreground: 220 10% 42%;
+    --accent: 340 40% 96%;
+    --accent-foreground: 340 65% 35%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 340 65% 42%;
+    --radius: 0.75rem;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 220 20% 25%;
+    --sidebar-accent: 340 40% 96%;
+  }
+
+  .dark {
+    --background: 224 28% 8%;
+    --foreground: 40 20% 96%;
+    --card: 224 24% 11%;
+    --card-foreground: 40 20% 96%;
+    --primary: 340 70% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 224 18% 16%;
+    --secondary-foreground: 40 15% 90%;
+    --muted: 224 18% 14%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 340 30% 18%;
+    --accent-foreground: 340 70% 75%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 224 16% 18%;
+    --input: 224 16% 18%;
+    --ring: 340 70% 58%;
+    --sidebar: 224 26% 9%;
+    --sidebar-foreground: 40 15% 88%;
+    --sidebar-accent: 340 30% 16%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% -20%, hsl(340 65% 42% / 0.06), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, hsl(220 40% 50% / 0.04), transparent);
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% -20%, hsl(340 70% 58% / 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, hsl(220 50% 40% / 0.06), transparent);
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-border/60 shadow-soft;
+  }
+}
