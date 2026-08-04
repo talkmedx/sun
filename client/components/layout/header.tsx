@@ -23,7 +23,7 @@ export function Header() {
     }
     clearAuth();
     toast.success('Logged out');
-    router.push('/sun/login');
+    window.location.href = '/sun/login';
   }
 
   return (
@@ -47,7 +47,7 @@ export function Header() {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
 
-        <Button variant="ghost" size="icon" onClick={() => router.push('/notifications')}>
+        <Button variant="ghost" size="icon" onClick={() => router.push('/sun/notifications')}>
           <Bell className="h-4 w-4" />
         </Button>
 
