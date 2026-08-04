@@ -52,6 +52,17 @@ export function canAccessPath(role: string | undefined | null, pathname: string)
   if (!role) return false;
   const allowed = ROLE_NAV[role] || [];
   const map: { prefix: string; key: NavItemKey }[] = [
+    { prefix: '/sun/dashboard', key: 'dashboard' },
+    { prefix: '/sun/students', key: 'students' },
+    { prefix: '/sun/batches', key: 'batches' },
+    { prefix: '/sun/expenses', key: 'expenses' },
+    { prefix: '/sun/vendors', key: 'vendors' },
+    { prefix: '/sun/products', key: 'products' },
+    { prefix: '/sun/admissions', key: 'admissions' },
+    { prefix: '/sun/reports', key: 'reports' },
+    { prefix: '/sun/roles', key: 'roles' },
+    { prefix: '/sun/notifications', key: 'notifications' },
+    { prefix: '/sun/settings', key: 'settings' },
     { prefix: '/dashboard', key: 'dashboard' },
     { prefix: '/students', key: 'students' },
     { prefix: '/batches', key: 'batches' },
@@ -71,8 +82,8 @@ export function canAccessPath(role: string | undefined | null, pathname: string)
 }
 
 export function homeForRole(role: string | undefined | null): string {
-  if (role === CLIENT_ROLES.STAFF) return '/expenses';
-  return '/dashboard';
+  if (role === CLIENT_ROLES.STAFF) return '/sun/expenses';
+  return '/sun/dashboard';
 }
 
 export function isAdmin(role: string | undefined | null): boolean {

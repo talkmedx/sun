@@ -23,7 +23,7 @@ export function Header() {
     }
     clearAuth();
     toast.success('Logged out');
-    router.push('/login');
+    router.push('/sun/login');
   }
 
   return (

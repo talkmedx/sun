@@ -13,17 +13,17 @@ import { useUIStore, useAuthStore } from '@/store';
 import { ROLE_NAV, type NavItemKey } from '@/lib/permissions';
 
 const navItems: { href: string; label: string; key: NavItemKey; icon: React.ElementType }[] = [
-  { href: '/dashboard', label: 'Dashboard', key: 'dashboard', icon: LayoutDashboard },
-  { href: '/students', label: 'Students', key: 'students', icon: Users },
-  { href: '/batches', label: 'Batches', key: 'batches', icon: Layers },
-  { href: '/expenses', label: 'Expenses', key: 'expenses', icon: Wallet },
-  { href: '/vendors', label: 'Vendors', key: 'vendors', icon: Store },
-  { href: '/products', label: 'Products', key: 'products', icon: Package },
-  { href: '/admissions', label: 'Admissions', key: 'admissions', icon: ClipboardList },
-  { href: '/reports', label: 'Reports', key: 'reports', icon: BarChart3 },
-  { href: '/roles', label: 'Roles', key: 'roles', icon: Shield },
-  { href: '/notifications', label: 'Notifications', key: 'notifications', icon: Bell },
-  { href: '/settings', label: 'Settings', key: 'settings', icon: Settings },
+  { href: '/sun/dashboard', label: 'Dashboard', key: 'dashboard', icon: LayoutDashboard },
+  { href: '/sun/students', label: 'Students', key: 'students', icon: Users },
+  { href: '/sun/batches', label: 'Batches', key: 'batches', icon: Layers },
+  { href: '/sun/expenses', label: 'Expenses', key: 'expenses', icon: Wallet },
+  { href: '/sun/vendors', label: 'Vendors', key: 'vendors', icon: Store },
+  { href: '/sun/products', label: 'Products', key: 'products', icon: Package },
+  { href: '/sun/admissions', label: 'Admissions', key: 'admissions', icon: ClipboardList },
+  { href: '/sun/reports', label: 'Reports', key: 'reports', icon: BarChart3 },
+  { href: '/sun/roles', label: 'Roles', key: 'roles', icon: Shield },
+  { href: '/sun/notifications', label: 'Notifications', key: 'notifications', icon: Bell },
+  { href: '/sun/settings', label: 'Settings', key: 'settings', icon: Settings },
 ];
 
 export function Sidebar() {

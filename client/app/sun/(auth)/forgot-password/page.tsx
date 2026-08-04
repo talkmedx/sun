@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
                   Dev reset token: {resetToken}
                 </p>
               )}
-              <Link href="/login" className="text-primary hover:underline">
+              <Link href="/sun/login" className="text-primary hover:underline">
                 Back to login
               </Link>
             </div>
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
                 Send reset link
               </Button>
               <Link
-                href="/login"
+                href="/sun/login"
                 className="block text-center text-sm text-muted-foreground hover:text-primary"
               >
                 Back to login

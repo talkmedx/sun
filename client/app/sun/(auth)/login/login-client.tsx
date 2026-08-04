@@ -104,7 +104,7 @@ export default function LoginPage() {
                 {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
               </div>
               <div className="flex justify-end">
-                <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                <Link href="/sun/forgot-password" className="text-xs text-primary hover:underline">
                   Forgot password?
                 </Link>
               </div>

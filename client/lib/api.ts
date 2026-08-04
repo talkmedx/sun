@@ -47,8 +47,8 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${token}`;
         return api(original);
       }
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/sun/login')) {
+        window.location.href = '/sun/login';
       }
     }
     return Promise.reject(error);

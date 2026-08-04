@@ -73,7 +73,7 @@ export default function VendorsPage() {
           {isLoading ? <Skeleton className="h-40 w-full" /> : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {data?.data?.map((v) => (
-                <Link key={v.id} href={`/vendors/${v.id}`}>
+                <Link key={v.id} href={`/sun/vendors/${v.id}`}>
                   <Card className="h-full transition hover:border-primary/30">
                     <CardContent className="space-y-2 p-4">
                       <div className="flex items-start justify-between">

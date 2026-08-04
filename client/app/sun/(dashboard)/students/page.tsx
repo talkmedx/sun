@@ -155,7 +155,7 @@ export default function StudentsPage() {
                     <tr key={s.id} className="border-b border-border/50 hover:bg-muted/40">
                       <td className="py-3 pr-3 font-mono text-xs">{s.student_code}</td>
                       <td className="py-3 pr-3">
-                        <Link href={`/students/${s.id}`} className="font-medium hover:text-primary">
+                        <Link href={`/sun/students/${s.id}`} className="font-medium hover:text-primary">
                           {s.first_name} {s.last_name}
                         </Link>
                       </td>
@@ -167,7 +167,7 @@ export default function StudentsPage() {
                       <td className="py-3">
                         <div className="flex gap-1">
                           <Button variant="ghost" size="icon" asChild>
-                            <Link href={`/students/${s.id}`}><Pencil className="h-4 w-4" /></Link>
+                            <Link href={`/sun/students/${s.id}`}><Pencil className="h-4 w-4" /></Link>
                           </Button>
                           <Button
                             variant="ghost"

@@ -123,7 +123,7 @@ export default function ProductsPage() {
                   {data?.data?.map((p) => (
                     <tr key={p.id} className="border-b border-border/50">
                       <td className="py-3">
-                        <Link href={`/products/${p.id}`} className="font-medium hover:text-primary">{p.name}</Link>
+                        <Link href={`/sun/products/${p.id}`} className="font-medium hover:text-primary">{p.name}</Link>
                         {p.quantity_available <= p.low_stock_threshold && (
                           <Badge variant="warning" className="ml-2">Low</Badge>
                         )}

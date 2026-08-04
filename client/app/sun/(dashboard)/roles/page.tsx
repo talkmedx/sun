@@ -39,7 +39,7 @@ export default function RolesPage() {
 
   useEffect(() => {
     if (user && !isSuperAdmin(user.role)) {
-      router.replace('/dashboard');
+      router.replace('/sun/dashboard');
     }
   }, [user, router]);
 

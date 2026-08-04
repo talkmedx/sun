@@ -75,7 +75,7 @@ export default function AdmissionsPage() {
           <h1 className="font-display text-2xl font-semibold">Admissions</h1>
           <p className="text-sm text-muted-foreground">
             Public form:{' '}
-            <Link href="/admission" className="text-primary hover:underline" target="_blank">
+            <Link href="/sun/admission" className="text-primary hover:underline" target="_blank">
               /admission
             </Link>
           </p>
@@ -110,7 +110,7 @@ export default function AdmissionsPage() {
                   {data?.data?.map((a) => (
                     <tr key={a.id} className="border-b border-border/50">
                       <td className="py-3">
-                        <Link href={`/admissions/${a.id}`} className="font-medium hover:text-primary">
+                        <Link href={`/sun/admissions/${a.id}`} className="font-medium hover:text-primary">
                           {a.first_name} {a.last_name}
                         </Link>
                       </td>
