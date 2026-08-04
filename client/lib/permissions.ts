@@ -82,8 +82,8 @@ export function canAccessPath(role: string | undefined | null, pathname: string)
 }
 
 export function homeForRole(role: string | undefined | null): string {
-  if (role === CLIENT_ROLES.STAFF) return '/sun/expenses';
-  return '/sun/dashboard';
+  if (role === CLIENT_ROLES.STAFF) return '/expenses';
+  return '/dashboard';
 }
 
 export function isAdmin(role: string | undefined | null): boolean {

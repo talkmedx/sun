@@ -19,7 +19,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
     if (!token) {
-      router.replace(`/sun/login?next=${encodeURIComponent(pathname)}`);
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
 

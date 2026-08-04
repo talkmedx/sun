@@ -25,20 +25,20 @@ const cards: {
   href: string;
   currency?: boolean;
 }[] = [
-  { key: 'total_fees_collected', label: 'Fees Collected', icon: IndianRupee, href: '/sun/reports?tab=fees', currency: true },
-  { key: 'total_fees_committed', label: 'Fees Committed', icon: TrendingUp, href: '/sun/reports?tab=fees', currency: true },
-  { key: 'total_students', label: 'Students', icon: Users, href: '/sun/students' },
-  { key: 'pending_fees', label: 'Pending Fees', icon: AlertCircle, href: '/sun/students?filter=pending', currency: true },
-  { key: 'expenses', label: 'Expenses', icon: Wallet, href: '/sun/expenses', currency: true },
-  { key: 'pending_vendor_payments', label: 'Pending Vendor Payments', icon: Store, href: '/sun/vendors', currency: true },
-  { key: 'vendors', label: 'Vendors', icon: Store, href: '/sun/vendors' },
-  { key: 'batches', label: 'Batches', icon: Layers, href: '/sun/batches' },
-  { key: 'batch_profit', label: 'Batch Profit', icon: TrendingUp, href: '/sun/reports?tab=profit', currency: true },
-  { key: 'financial_year_profit', label: 'FY Profit', icon: TrendingUp, href: '/sun/reports?tab=profit', currency: true },
-  { key: 'product_profit', label: 'Product Profit', icon: Package, href: '/sun/reports?tab=inventory', currency: true },
-  { key: 'current_fy_expenses', label: 'Current FY Expenses', icon: Wallet, href: '/sun/expenses', currency: true },
-  { key: 'overall_students', label: 'Overall Students', icon: Users, href: '/sun/students' },
-  { key: 'stock_value', label: 'Stock Value', icon: Boxes, href: '/sun/products', currency: true },
+  { key: 'total_fees_collected', label: 'Fees Collected', icon: IndianRupee, href: '/reports?tab=fees', currency: true },
+  { key: 'total_fees_committed', label: 'Fees Committed', icon: TrendingUp, href: '/reports?tab=fees', currency: true },
+  { key: 'total_students', label: 'Students', icon: Users, href: '/students' },
+  { key: 'pending_fees', label: 'Pending Fees', icon: AlertCircle, href: '/students?filter=pending', currency: true },
+  { key: 'expenses', label: 'Expenses', icon: Wallet, href: '/expenses', currency: true },
+  { key: 'pending_vendor_payments', label: 'Pending Vendor Payments', icon: Store, href: '/vendors', currency: true },
+  { key: 'vendors', label: 'Vendors', icon: Store, href: '/vendors' },
+  { key: 'batches', label: 'Batches', icon: Layers, href: '/batches' },
+  { key: 'batch_profit', label: 'Batch Profit', icon: TrendingUp, href: '/reports?tab=profit', currency: true },
+  { key: 'financial_year_profit', label: 'FY Profit', icon: TrendingUp, href: '/reports?tab=profit', currency: true },
+  { key: 'product_profit', label: 'Product Profit', icon: Package, href: '/reports?tab=inventory', currency: true },
+  { key: 'current_fy_expenses', label: 'Current FY Expenses', icon: Wallet, href: '/expenses', currency: true },
+  { key: 'overall_students', label: 'Overall Students', icon: Users, href: '/students' },
+  { key: 'stock_value', label: 'Stock Value', icon: Boxes, href: '/products', currency: true },
 ];
 
 function shortMonth(month: string) {
