@@ -10,7 +10,7 @@ import {
   uploadProfile, uploadDocument, uploadExpense, uploadBill, uploadPayment, uploadAdmission,
 } from '../middleware/upload';
 import {
-  studentSchema, batchSchema, batchBaseSchema, expenseSchema, vendorSchema, vendorCreditSchema,
+  studentSchema, batchSchema, batchBaseSchema, courseSchema, expenseSchema, vendorSchema, vendorCreditSchema,
   productSchema, feeSchema, studentProductSchema, admissionSchema, rejectAdmissionSchema,
   createStaffSchema, createUserSchema, updateRoleSchema,
 } from '../validations/schemas';
@@ -86,8 +86,8 @@ router.delete('/students/:id/documents/:docId', adminOnly, students.deleteDocume
 // Courses — full CRUD admin only; dropdown allowed for staff
 router.get('/courses', staffOk, courses.list);
 router.get('/courses/:id', staffOk, courses.get);
-router.post('/courses', adminOnly, courses.create);
-router.put('/courses/:id', adminOnly, courses.update);
+router.post('/courses', adminOnly, validate(courseSchema), courses.create);
+router.put('/courses/:id', adminOnly, validate(courseSchema.partial()), courses.update);
 router.delete('/courses/:id', adminOnly, courses.remove);
 
 // Batches — full CRUD admin only; dropdown allowed for staff (forms)

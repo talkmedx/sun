@@ -174,3 +174,12 @@ export const createUserSchema = z.object({
 export const updateRoleSchema = z.object({
   role: z.enum(['admin', 'staff']),
 });
+
+export const courseSchema = z.object({
+  name: z.string().min(1).max(150),
+  duration_days: z.coerce.number().int().positive(),
+  default_fee: z.coerce.number().min(0).optional().nullable(),
+  description: z.string().optional().nullable(),
+  is_active: z.coerce.number().int().optional(),
+});
+
