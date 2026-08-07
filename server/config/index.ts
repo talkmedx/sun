@@ -26,7 +26,7 @@ export const config = {
   },
 
   upload: {
-    maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '5', 10),
+    maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '25', 10),
     dir: process.env.UPLOAD_DIR || 'uploads',
   },
 

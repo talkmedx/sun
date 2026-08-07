@@ -3,23 +3,36 @@ import { query, queryOne, execute } from '../config/database';
 import { NotFoundError, ConflictError, AppError } from '../utils/errors';
 import { paginate, likePattern } from '../helpers/queryHelpers';
 
-export async function listBatches(search?: string, status?: string) {
+export async function listBatches(search?: string, status?: string, year?: number, course?: string) {
   const conditions = ['b.deleted_at IS NULL'];
   const params: Record<string, unknown> = {};
 
   if (search) {
-    conditions.push('b.name LIKE :search');
+    conditions.push('(b.name LIKE :search OR b.description LIKE :search)');
     params.search = likePattern(search);
   }
   if (status) {
     conditions.push('b.status = :status');
     params.status = status;
   }
+  if (year) {
+    conditions.push('YEAR(b.start_date) = :year');
+    params.year = Number(year);
+  }
+  if (course) {
+    conditions.push('b.name LIKE :course');
+    params.course = likePattern(course);
+  }
 
   return query<RowDataPacket[]>(
     `SELECT b.*,
             (SELECT COUNT(*) FROM students s WHERE s.batch_id = b.id AND s.deleted_at IS NULL) AS student_count,
-            COALESCE((SELECT batch_profit FROM vw_batch_summary v WHERE v.id = b.id), 0) AS profit
+            (SELECT COALESCE(SUM(s.fees_paid), 0) FROM students s WHERE s.batch_id = b.id AND s.deleted_at IS NULL) AS fees_collected,
+            (SELECT COALESCE(SUM(e.amount), 0) FROM expenses e WHERE e.batch_id = b.id AND e.deleted_at IS NULL) AS expenses,
+            (SELECT COALESCE(SUM(sp.total_amount - (sp.unit_cost_price * sp.quantity)), 0)
+             FROM student_products sp
+             JOIN students s ON s.id = sp.student_id
+             WHERE s.batch_id = b.id AND sp.deleted_at IS NULL AND s.deleted_at IS NULL) AS product_profit
      FROM batches b
      WHERE ${conditions.join(' AND ')}
      ORDER BY b.start_date DESC, b.id DESC`,

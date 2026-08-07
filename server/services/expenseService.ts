@@ -10,6 +10,9 @@ interface ListParams {
   batch_id?: number;
   vendor_id?: number;
   category?: string;
+  start_date?: string;
+  end_date?: string;
+  financial_year?: string;
 }
 
 export async function listExpenses(params: ListParams) {
@@ -18,7 +21,9 @@ export async function listExpenses(params: ListParams) {
   const q: Record<string, unknown> = {};
 
   if (params.search) {
-    conditions.push('(e.title LIKE :search OR e.description LIKE :search OR e.category LIKE :search)');
+    conditions.push(
+      '(e.title LIKE :search OR e.description LIKE :search OR e.category LIKE :search OR e.payment_mode LIKE :search OR CAST(e.amount AS CHAR) LIKE :search OR b.name LIKE :search OR v.name LIKE :search)'
+    );
     q.search = likePattern(params.search);
   }
   if (params.batch_id) {
@@ -33,10 +38,22 @@ export async function listExpenses(params: ListParams) {
     conditions.push('e.category = :category');
     q.category = params.category;
   }
+  if (params.start_date) {
+    conditions.push('e.expense_date >= :startDate');
+    q.startDate = params.start_date;
+  }
+  if (params.end_date) {
+    conditions.push('e.expense_date <= :endDate');
+    q.endDate = params.end_date;
+  }
+  if (params.financial_year) {
+    conditions.push('e.financial_year = :financialYear');
+    q.financialYear = params.financial_year;
+  }
 
   const where = conditions.join(' AND ');
   const countRow = await queryOne<RowDataPacket>(
-    `SELECT COUNT(*) AS total FROM expenses e WHERE ${where}`,
+    `SELECT COUNT(*) AS total FROM expenses e LEFT JOIN batches b ON b.id = e.batch_id LEFT JOIN vendors v ON v.id = e.vendor_id WHERE ${where}`,
     q
   );
 
@@ -74,9 +91,9 @@ export async function createExpense(
   screenshotUrl?: string
 ) {
   return withTransaction(async (conn) => {
-    const useCredit = Boolean(data.use_vendor_credit) || data.payment_mode === 'vendor_credit';
-    const amount = Number(data.amount);
     const vendorId = data.vendor_id ? Number(data.vendor_id) : null;
+    const useCredit = vendorId ? true : Boolean(data.use_vendor_credit) || data.payment_mode === 'vendor_credit';
+    const amount = Number(data.amount);
     const fy = getFinancialYear(new Date(String(data.expense_date)));
 
     if (useCredit) {
@@ -147,7 +164,7 @@ export async function updateExpense(id: number, data: Record<string, unknown>) {
 
   const fields = [
     'title', 'description', 'amount', 'category', 'batch_id', 'vendor_id',
-    'expense_date', 'payment_mode',
+    'expense_date', 'payment_mode', 'screenshot_url',
   ];
   const sets: string[] = [];
   const params: Record<string, unknown> = { id };

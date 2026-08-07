@@ -8,6 +8,15 @@ export interface User {
   is_active?: number;
 }
 
+export interface Course {
+  id: number;
+  name: string;
+  duration_days: number;
+  default_fee?: number | null;
+  description?: string | null;
+  is_active: number;
+}
+
 export interface Batch {
   id: number;
   name: string;
@@ -47,6 +56,10 @@ export interface Student {
   pending_fees?: number;
   status: string;
   notes?: string | null;
+  age?: number | null;
+  designation?: string | null;
+  admission_date?: string | null;
+  expense_amount?: number;
   created_at: string;
 }
 
@@ -73,8 +86,11 @@ export interface Vendor {
   contact_person?: string | null;
   email?: string | null;
   phone: string;
+  address?: string | null;
   city?: string | null;
   state?: string | null;
+  pincode?: string | null;
+  gstin?: string | null;
   pending_credit: number;
   is_active: number;
   notes?: string | null;
@@ -103,10 +119,25 @@ export interface Admission {
   last_name?: string | null;
   email?: string | null;
   phone: string;
+  alternate_phone?: string | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
   city?: string | null;
   state?: string | null;
+  pincode?: string | null;
   batch_id?: number | null;
   batch_name?: string | null;
+  batch_start_date?: string | null;
+  batch_end_date?: string | null;
+  batch_course_fee?: number | null;
+  batch_offer_fee?: number | null;
+  preferred_batch_note?: string | null;
+  fees_committed?: number;
+  fees_collected?: number;
+  student_id?: number | null;
+  student_code?: string | null;
   photo_url?: string | null;
   proof_url?: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'edit_requested';
@@ -135,10 +166,12 @@ export interface DashboardSummary {
   pending_vendor_payments: number;
   vendors: number;
   batches: number;
+  batch_revenue?: number;
+  offer_expense?: number;
+  fees_profit?: number;
   batch_profit: number;
   financial_year_profit: number;
   product_profit: number;
-  overall_students: number;
   stock_value: number;
 }
 

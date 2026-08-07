@@ -1,22 +1,21 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Shield } from 'lucide-react';
-import { useEffect } from 'react';
+import { Plus, Shield, Search, LayoutGrid, List, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usersApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Badge, Skeleton } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuthStore } from '@/store';
 import { getErrorMessage } from '@/lib/api';
 import { isSuperAdmin, ROLE_DESCRIPTIONS } from '@/lib/permissions';
-import { useState } from 'react';
 
 const roleBadge = (role: string) => {
   if (role === 'super_admin') return 'default' as const;
@@ -36,6 +35,11 @@ export default function RolesPage() {
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
+  const [visibleCount, setVisibleCount] = useState(10);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (user && !isSuperAdmin(user.role)) {
@@ -52,6 +56,45 @@ export default function RolesPage() {
     queryFn: async () => (await usersApi.list()).data.data,
     enabled: isSuperAdmin(user?.role),
   });
+
+  // Filter users based on search and role
+  const filteredUsers = (users || []).filter((u) => {
+    const matchesSearch =
+      !search ||
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase());
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const displayedUsers = filteredUsers.slice(0, visibleCount);
+  const hasNextPage = visibleCount < filteredUsers.length;
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [search, roleFilter]);
+
+  // Infinite scroll listener
+  useEffect(() => {
+    if (!hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage) {
+          setVisibleCount((prev) => Math.min(prev + 10, filteredUsers.length));
+        }
+      },
+      { threshold: 0.1, rootMargin: '200px' }
+    );
+
+    const target = loadMoreRef.current;
+    if (target) observer.observe(target);
+
+    return () => {
+      if (target) observer.unobserve(target);
+    };
+  }, [hasNextPage, filteredUsers.length]);
 
   const createUser = useMutation({
     mutationFn: (v: {
@@ -105,7 +148,7 @@ export default function RolesPage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="h-4 w-4" /> Add Role / User
+              <Plus className="h-4 w-4 mr-1.5" /> Add Role / User
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -186,31 +229,96 @@ export default function RolesPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Team & Roles</CardTitle>
-          <CardDescription>All users with assigned roles</CardDescription>
+        <CardHeader className="p-4 sm:p-6 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-semibold">Team & Roles</CardTitle>
+              {filteredUsers.length > 0 && (
+                <span className="text-xs text-muted-foreground font-normal">
+                  ({displayedUsers.length} of {filteredUsers.length})
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/20 shrink-0">
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 sm:h-8 sm:w-8"
+                title="Grid view"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 sm:h-8 sm:w-8"
+                title="Table view"
+                onClick={() => setViewMode('table')}
+              >
+                <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-8 h-9 text-xs sm:text-sm w-full"
+                placeholder="Search team members..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[125px] sm:w-40 h-9 text-xs sm:text-sm shrink-0">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All roles</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="staff">Staff</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}
+              </div>
+              <div className="hidden md:block space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 pr-3">Name</th>
-                    <th className="pb-3 pr-3">Email</th>
-                    <th className="pb-3 pr-3">Role</th>
-                    <th className="pb-3 pr-3">Status</th>
-                    <th className="pb-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users?.map((u) => (
-                    <tr key={u.id} className="border-b border-border/50">
-                      <td className="py-3 pr-3 font-medium">{u.name}</td>
-                      <td className="py-3 pr-3">{u.email}</td>
-                      <td className="py-3 pr-3">
+            <>
+              {/* Mobile Card Grid View */}
+              <div className={
+                viewMode === 'grid'
+                  ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'
+                  : viewMode === 'table'
+                  ? 'hidden'
+                  : 'grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden'
+              }>
+                {displayedUsers.map((u) => (
+                  <div key={u.id} className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-base leading-tight">{u.name}</p>
+                        <p className="text-xs text-muted-foreground">{u.email}</p>
+                      </div>
+                      <Badge variant={u.is_active ? 'success' : 'destructive'}>
+                        {u.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/50">
+                      <div>
+                        <span className="text-muted-foreground block">Role</span>
                         {u.role === 'super_admin' ? (
                           <Badge variant={roleBadge(u.role)}>{roleLabel(u.role)}</Badge>
                         ) : (
@@ -218,42 +326,133 @@ export default function RolesPage() {
                             value={u.role}
                             onValueChange={(role) => updateRole.mutate({ id: u.id, role })}
                           >
-                            <SelectTrigger className="h-8 w-40">
+                            <SelectTrigger className="h-7 w-28 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="staff">Staff Member</SelectItem>
+                              <SelectItem value="staff">Staff</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
-                      </td>
-                      <td className="py-3 pr-3">
-                        <Badge variant={u.is_active ? 'success' : 'destructive'}>
-                          {u.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="py-3">
-                        {u.role !== 'super_admin' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              toggleActive.mutate({
-                                id: u.id,
-                                is_active: !u.is_active,
-                              })
-                            }
-                          >
-                            {u.is_active ? 'Deactivate' : 'Activate'}
-                          </Button>
-                        )}
-                      </td>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Phone</span>
+                        <span className="font-medium truncate block">{u.phone || '—'}</span>
+                      </div>
+                    </div>
+
+                    {u.role !== 'super_admin' && (
+                      <div className="flex items-center justify-end pt-2 border-t border-border/50">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs px-3"
+                          onClick={() =>
+                            toggleActive.mutate({
+                              id: u.id,
+                              is_active: !u.is_active,
+                            })
+                          }
+                        >
+                          {u.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {!displayedUsers.length && (
+                  <div className="py-8 text-center text-muted-foreground col-span-full">No users found</div>
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className={
+                viewMode === 'table'
+                  ? 'overflow-x-auto'
+                  : viewMode === 'grid'
+                  ? 'hidden'
+                  : 'hidden md:block overflow-x-auto'
+              }>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-3 pr-3 font-medium">Name</th>
+                      <th className="pb-3 pr-3 font-medium">Email</th>
+                      <th className="pb-3 pr-3 font-medium">Role</th>
+                      <th className="pb-3 pr-3 font-medium">Status</th>
+                      <th className="pb-3 font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {displayedUsers.map((u) => (
+                      <tr key={u.id} className="border-b border-border/50 hover:bg-muted/40">
+                        <td className="py-3 pr-3 font-medium">{u.name}</td>
+                        <td className="py-3 pr-3">{u.email}</td>
+                        <td className="py-3 pr-3">
+                          {u.role === 'super_admin' ? (
+                            <Badge variant={roleBadge(u.role)}>{roleLabel(u.role)}</Badge>
+                          ) : (
+                            <Select
+                              value={u.role}
+                              onValueChange={(role) => updateRole.mutate({ id: u.id, role })}
+                            >
+                              <SelectTrigger className="h-8 w-40">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="staff">Staff Member</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <Badge variant={u.is_active ? 'success' : 'destructive'}>
+                            {u.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </td>
+                        <td className="py-3">
+                          {u.role !== 'super_admin' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                toggleActive.mutate({
+                                  id: u.id,
+                                  is_active: !u.is_active,
+                                })
+                              }
+                            >
+                              {u.is_active ? 'Deactivate' : 'Activate'}
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {!displayedUsers.length && (
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No users found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Scroll Trigger sentinel & Loading state */}
+              <div ref={loadMoreRef} className="mt-4 py-4 text-center">
+                {hasNextPage ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setVisibleCount((prev) => Math.min(prev + 10, filteredUsers.length))}
+                  >
+                    Scroll down or click to load next 10 (Showing {displayedUsers.length} of {filteredUsers.length})
+                  </Button>
+                ) : displayedUsers.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">All {filteredUsers.length} users loaded</p>
+                ) : null}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

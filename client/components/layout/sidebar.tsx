@@ -6,16 +6,19 @@ import { motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, Layers, Wallet, Store, Package,
   ClipboardList, BarChart3, Bell, Settings, Sparkles, ChevronLeft, ChevronRight,
-  Shield, X,
+  Shield, X, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore, useAuthStore } from '@/store';
+import { useQuery } from '@tanstack/react-query';
+import { admissionsApi } from '@/services/api';
 import { ROLE_NAV, type NavItemKey } from '@/lib/permissions';
 
 const navItems: { href: string; label: string; key: NavItemKey; icon: React.ElementType }[] = [
   { href: '/sun/dashboard', label: 'Dashboard', key: 'dashboard', icon: LayoutDashboard },
   { href: '/sun/students', label: 'Students', key: 'students', icon: Users },
   { href: '/sun/batches', label: 'Batches', key: 'batches', icon: Layers },
+  { href: '/sun/courses', label: 'Courses', key: 'courses', icon: BookOpen },
   { href: '/sun/expenses', label: 'Expenses', key: 'expenses', icon: Wallet },
   { href: '/sun/vendors', label: 'Vendors', key: 'vendors', icon: Store },
   { href: '/sun/products', label: 'Products', key: 'products', icon: Package },
@@ -32,6 +35,13 @@ export function Sidebar() {
   const role = useAuthStore((s) => s.user?.role) || 'admin';
   const allowed = ROLE_NAV[role] || ROLE_NAV.admin;
   const nav = navItems.filter((item) => allowed.includes(item.key));
+
+  const { data: pendingAdmissionsData } = useQuery({
+    queryKey: ['pending-admissions-count'],
+    queryFn: async () => (await admissionsApi.list({ status: 'pending', limit: 1 })).data,
+    refetchInterval: 10000,
+  });
+  const pendingCount = pendingAdmissionsData?.meta?.total ?? 0;
 
   return (
     <>
@@ -106,6 +116,11 @@ export function Sidebar() {
                 <span className={cn('relative z-10 truncate', !sidebarOpen && 'md:hidden')}>
                   {item.label}
                 </span>
+                {item.key === 'admissions' && pendingCount > 0 && (
+                  <span className="relative z-10 ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white shadow-xs">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}

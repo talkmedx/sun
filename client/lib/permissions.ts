@@ -8,6 +8,7 @@ export type NavItemKey =
   | 'dashboard'
   | 'students'
   | 'batches'
+  | 'courses'
   | 'expenses'
   | 'vendors'
   | 'products'
@@ -20,14 +21,14 @@ export type NavItemKey =
 /** Sidebar / page access by role */
 export const ROLE_NAV: Record<string, NavItemKey[]> = {
   super_admin: [
-    'dashboard', 'students', 'batches', 'expenses', 'vendors',
+    'dashboard', 'students', 'batches', 'courses', 'expenses', 'vendors',
     'products', 'admissions', 'reports', 'roles', 'notifications', 'settings',
   ],
   admin: [
-    'dashboard', 'students', 'batches', 'expenses', 'vendors',
+    'dashboard', 'students', 'batches', 'courses', 'expenses', 'vendors',
     'products', 'admissions', 'reports', 'notifications', 'settings',
   ],
-  staff: ['expenses', 'vendors', 'products', 'admissions', 'notifications', 'settings'],
+  staff: ['students', 'products', 'expenses', 'admissions', 'notifications', 'settings'],
 };
 
 export const ROLE_DESCRIPTIONS = [
@@ -44,7 +45,7 @@ export const ROLE_DESCRIPTIONS = [
   {
     key: 'staff',
     label: 'Staff Member',
-    description: 'Limited to Expenses, Vendors, Products, and Admissions only.',
+    description: 'Limited to Students, Products, Expenses, and Admissions only.',
   },
 ];
 
@@ -55,6 +56,7 @@ export function canAccessPath(role: string | undefined | null, pathname: string)
     { prefix: '/sun/dashboard', key: 'dashboard' },
     { prefix: '/sun/students', key: 'students' },
     { prefix: '/sun/batches', key: 'batches' },
+    { prefix: '/sun/courses', key: 'courses' },
     { prefix: '/sun/expenses', key: 'expenses' },
     { prefix: '/sun/vendors', key: 'vendors' },
     { prefix: '/sun/products', key: 'products' },

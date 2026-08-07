@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as dashboardService from '../services/dashboardService';
 import * as studentService from '../services/studentService';
 import * as batchService from '../services/batchService';
+import * as courseService from '../services/courseService';
 import * as expenseService from '../services/expenseService';
 import * as vendorService from '../services/vendorService';
 import * as productService from '../services/productService';
@@ -16,7 +17,8 @@ export const dashboard = {
   summary: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const batchId = req.query.batch_id ? Number(req.query.batch_id) : undefined;
-      return success(res, await dashboardService.getSummary(batchId));
+      const fy = req.query.fy as string | undefined;
+      return success(res, await dashboardService.getSummary(batchId, fy));
     } catch (e) { next(e); }
   },
   charts: async (req: Request, res: Response, next: NextFunction) => {
@@ -93,6 +95,18 @@ export const students = {
       return created(res, await studentService.addFee(Number(req.params.id), req.body, req.user!.userId, screenshot));
     } catch (e) { next(e); }
   },
+  updateFee: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const screenshot = req.file ? publicUploadPath('payments', req.file.filename) : undefined;
+      return success(res, await studentService.updateFee(Number(req.params.id), Number(req.params.feeId), req.body, screenshot));
+    } catch (e) { next(e); }
+  },
+  deleteFee: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await studentService.deleteFee(Number(req.params.id), Number(req.params.feeId));
+      return success(res, null, 'Fee transaction deleted');
+    } catch (e) { next(e); }
+  },
   products: async (req: Request, res: Response, next: NextFunction) => {
     try {
       return success(res, await studentService.listStudentProducts(Number(req.params.id)));
@@ -101,6 +115,17 @@ export const students = {
   addProduct: async (req: Request, res: Response, next: NextFunction) => {
     try {
       return created(res, await studentService.addStudentProduct(Number(req.params.id), req.body, req.user!.userId));
+    } catch (e) { next(e); }
+  },
+  updateProduct: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await studentService.updateStudentProduct(Number(req.params.id), Number(req.params.productId), req.body));
+    } catch (e) { next(e); }
+  },
+  deleteProduct: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await studentService.deleteStudentProduct(Number(req.params.id), Number(req.params.productId));
+      return success(res, null, 'Student product purchase deleted');
     } catch (e) { next(e); }
   },
   documents: async (req: Request, res: Response, next: NextFunction) => {
@@ -125,13 +150,47 @@ export const students = {
       );
     } catch (e) { next(e); }
   },
+  updateDocument: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      let url: string | undefined;
+      if (req.file) {
+        url = publicUploadPath('documents', req.file.filename);
+      }
+      return success(
+        res,
+        await studentService.updateDocument(
+          Number(req.params.id),
+          Number(req.params.docId),
+          req.body.title,
+          url,
+          req.file?.mimetype,
+          req.file?.size
+        ),
+        'Document updated'
+      );
+    } catch (e) { next(e); }
+  },
+  deleteDocument: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await studentService.deleteDocument(Number(req.params.id), Number(req.params.docId));
+      return success(res, null, 'Document deleted');
+    } catch (e) { next(e); }
+  },
 };
 
 // ── Batches ────────────────────────────────────────────────
 export const batches = {
   list: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      return success(res, await batchService.listBatches(req.query.search as string, req.query.status as string));
+      return success(
+        res,
+        await batchService.listBatches(
+          req.query.search as string,
+          req.query.status as string,
+          req.query.year ? Number(req.query.year) : undefined,
+          req.query.course as string
+        )
+      );
     } catch (e) { next(e); }
   },
   dropdown: async (_req: Request, res: Response, next: NextFunction) => {
@@ -162,6 +221,36 @@ export const batches = {
   },
 };
 
+// ── Courses ────────────────────────────────────────────────
+export const courses = {
+  list: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await courseService.listCourses(req.query.search as string));
+    } catch (e) { next(e); }
+  },
+  get: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await courseService.getCourse(Number(req.params.id)));
+    } catch (e) { next(e); }
+  },
+  create: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      return created(res, await courseService.createCourse({ ...req.body, created_by: req.user!.userId }));
+    } catch (e) { next(e); }
+  },
+  update: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await courseService.updateCourse(Number(req.params.id), req.body), 'Updated');
+    } catch (e) { next(e); }
+  },
+  remove: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await courseService.deleteCourse(Number(req.params.id));
+      return success(res, null, 'Deleted');
+    } catch (e) { next(e); }
+  },
+};
+
 // ── Expenses ───────────────────────────────────────────────
 export const expenses = {
   list: async (req: Request, res: Response, next: NextFunction) => {
@@ -173,6 +262,9 @@ export const expenses = {
         batch_id: req.query.batch_id ? Number(req.query.batch_id) : undefined,
         vendor_id: req.query.vendor_id ? Number(req.query.vendor_id) : undefined,
         category: req.query.category as string,
+        start_date: req.query.start_date as string,
+        end_date: req.query.end_date as string,
+        financial_year: req.query.financial_year as string,
       });
       return success(res, rows, 'OK', 200, meta);
     } catch (e) { next(e); }
@@ -190,7 +282,9 @@ export const expenses = {
   },
   update: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      return success(res, await expenseService.updateExpense(Number(req.params.id), req.body), 'Updated');
+      const screenshot = req.file ? publicUploadPath('expenses', req.file.filename) : undefined;
+      const data = screenshot ? { ...req.body, screenshot_url: screenshot } : req.body;
+      return success(res, await expenseService.updateExpense(Number(req.params.id), data), 'Updated');
     } catch (e) { next(e); }
   },
   remove: async (req: Request, res: Response, next: NextFunction) => {
@@ -252,6 +346,18 @@ export const vendors = {
       return created(res, await vendorService.addCredit(Number(req.params.id), req.body, req.user!.userId, bill));
     } catch (e) { next(e); }
   },
+  deleteCredit: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await vendorService.deleteCredit(Number(req.params.id), Number(req.params.creditId));
+      return success(res, null, 'Credit deleted');
+    } catch (e) { next(e); }
+  },
+  updateCredit: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const bill = req.file ? publicUploadPath('bills', req.file.filename) : undefined;
+      return success(res, await vendorService.updateCredit(Number(req.params.id), Number(req.params.creditId), req.body, bill));
+    } catch (e) { next(e); }
+  },
   expenses: async (req: Request, res: Response, next: NextFunction) => {
     try {
       return success(res, await vendorService.listVendorExpenses(Number(req.params.id)));
@@ -268,8 +374,14 @@ export const products = {
         limit: Number(req.query.limit),
         search: req.query.search as string,
         vendor_id: req.query.vendor_id ? Number(req.query.vendor_id) : undefined,
+        stock_status: req.query.stock_status as 'available' | 'out_of_stock' | 'all',
       });
       return success(res, rows, 'OK', 200, meta);
+    } catch (e) { next(e); }
+  },
+  summary: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await productService.getProductSummary());
     } catch (e) { next(e); }
   },
   get: async (req: Request, res: Response, next: NextFunction) => {

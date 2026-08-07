@@ -2,8 +2,8 @@ import { RowDataPacket } from 'mysql2';
 import { query, queryOne } from '../config/database';
 import { getCurrentFyBounds, getFinancialYear } from '../helpers/queryHelpers';
 
-export async function getSummary(batchId?: number) {
-  const { start, end, fy } = getCurrentFyBounds();
+export async function getSummary(batchId?: number, fyParam?: string) {
+  const { start, end, fy } = getCurrentFyBounds(fyParam);
   const batchFilter = batchId ? 'AND s.batch_id = :batchId' : '';
   const batchExpenseFilter = batchId ? 'AND e.batch_id = :batchId' : '';
   const params: Record<string, unknown> = { start, end, batchId: batchId ?? null };
@@ -46,36 +46,48 @@ export async function getSummary(batchId?: number) {
     `SELECT COUNT(*) AS batch_count FROM batches WHERE deleted_at IS NULL`
   );
 
-  const overallStudents = await queryOne<RowDataPacket>(
-    `SELECT COUNT(*) AS count FROM students WHERE deleted_at IS NULL`
-  );
-
   const stock = await queryOne<RowDataPacket>(
     `SELECT COALESCE(SUM(quantity_available * cost_price), 0) AS stock_value,
             COALESCE(SUM(
               (SELECT COALESCE(SUM(sp.quantity * (sp.unit_selling_price - sp.unit_cost_price)), 0)
-               FROM student_products sp WHERE sp.product_id = p.id AND sp.deleted_at IS NULL)
+               FROM student_products sp
+               JOIN students s ON s.id = sp.student_id
+               WHERE sp.product_id = p.id AND sp.deleted_at IS NULL AND s.deleted_at IS NULL ${batchFilter})
             ), 0) AS product_profit
-     FROM products p WHERE p.deleted_at IS NULL`
+     FROM products p WHERE p.deleted_at IS NULL`,
+    params
   );
+
+  let batchInfo: Record<string, unknown> | null = null;
+  if (batchId) {
+    batchInfo = await queryOne<RowDataPacket>(
+      `SELECT b.*,
+              (SELECT COUNT(*) FROM students s WHERE s.batch_id = b.id AND s.deleted_at IS NULL) AS student_count,
+              (SELECT COALESCE(SUM(e.amount), 0) FROM expenses e WHERE e.batch_id = b.id AND e.deleted_at IS NULL) AS batch_expenses,
+              (SELECT COALESCE(SUM(sp.total_amount - (sp.unit_cost_price * sp.quantity)), 0)
+               FROM student_products sp
+               JOIN students s ON s.id = sp.student_id
+               WHERE s.batch_id = b.id AND sp.deleted_at IS NULL AND s.deleted_at IS NULL) AS batch_product_profit
+       FROM batches b
+       WHERE b.id = :batchId AND b.deleted_at IS NULL`,
+      { batchId }
+    );
+  }
+
+  const courseFee = Number(batchInfo?.course_fee || 0);
+  const offerFee = batchInfo?.offer_fee != null ? Number(batchInfo.offer_fee) : courseFee;
+  const studentCount = Number(batchInfo?.student_count || 0);
+
+  const batchRevenue = courseFee * studentCount;
+  const offerDiscount = Math.max(0, courseFee - offerFee);
+  const offerExpense = offerDiscount * studentCount;
+  const feesProfit = batchRevenue - offerExpense;
+  const productProfit = batchId ? Number(batchInfo?.batch_product_profit || 0) : Number(stock?.product_profit ?? 0);
+  const batchDirectExpenses = batchId ? Number(batchInfo?.batch_expenses || 0) : Number(overallExpenses?.total_expenses ?? 0);
+  const totalBatchProfit = (feesProfit + productProfit) - batchDirectExpenses;
 
   const feesCommitted = Number(fees?.total_fees_committed ?? 0);
   const fyExpenses = Number(expenses?.total_expenses ?? 0);
-
-  // Batch profit for selected batch or aggregate
-  let batchProfit = 0;
-  if (batchId) {
-    const bp = await queryOne<RowDataPacket>(
-      `SELECT batch_profit FROM vw_batch_summary WHERE id = :batchId`,
-      { batchId }
-    );
-    batchProfit = Number(bp?.batch_profit ?? 0);
-  } else {
-    const bp = await queryOne<RowDataPacket>(
-      `SELECT COALESCE(SUM(batch_profit), 0) AS total FROM vw_batch_summary`
-    );
-    batchProfit = Number(bp?.total ?? 0);
-  }
 
   return {
     financial_year: fy,
@@ -88,10 +100,12 @@ export async function getSummary(batchId?: number) {
     pending_vendor_payments: Number(vendors?.pending_vendor_payments ?? 0),
     vendors: Number(vendors?.vendor_count ?? 0),
     batches: Number(batches?.batch_count ?? 0),
-    batch_profit: batchProfit,
+    batch_revenue: batchRevenue,
+    offer_expense: offerExpense,
+    fees_profit: feesProfit,
+    batch_profit: totalBatchProfit,
     financial_year_profit: feesCommitted - fyExpenses,
-    product_profit: Number(stock?.product_profit ?? 0),
-    overall_students: Number(overallStudents?.count ?? 0),
+    product_profit: productProfit,
     stock_value: Number(stock?.stock_value ?? 0),
   };
 }

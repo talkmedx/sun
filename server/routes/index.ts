@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  dashboard, students, batches, expenses, vendors, products,
+  dashboard, students, batches, courses, expenses, vendors, products,
   admissions, notifications, reports,
 } from '../controllers';
 import * as usersController from '../controllers/usersController';
@@ -72,10 +72,23 @@ router.delete('/students/:id', adminOnly, students.remove);
 router.post('/students/:id/photo', adminOnly, uploadProfile.single('photo'), students.photo);
 router.get('/students/:id/fees', adminOnly, students.fees);
 router.post('/students/:id/fees', adminOnly, uploadPayment.single('screenshot'), validate(feeSchema), students.addFee);
+router.put('/students/:id/fees/:feeId', adminOnly, uploadPayment.single('screenshot'), students.updateFee);
+router.delete('/students/:id/fees/:feeId', adminOnly, students.deleteFee);
 router.get('/students/:id/products', adminOnly, students.products);
 router.post('/students/:id/products', adminOnly, validate(studentProductSchema), students.addProduct);
+router.put('/students/:id/products/:productId', adminOnly, students.updateProduct);
+router.delete('/students/:id/products/:productId', adminOnly, students.deleteProduct);
 router.get('/students/:id/documents', adminOnly, students.documents);
 router.post('/students/:id/documents', adminOnly, uploadDocument.single('file'), students.addDocument);
+router.put('/students/:id/documents/:docId', adminOnly, uploadDocument.single('file'), students.updateDocument);
+router.delete('/students/:id/documents/:docId', adminOnly, students.deleteDocument);
+
+// Courses — full CRUD admin only; dropdown allowed for staff
+router.get('/courses', staffOk, courses.list);
+router.get('/courses/:id', staffOk, courses.get);
+router.post('/courses', adminOnly, courses.create);
+router.put('/courses/:id', adminOnly, courses.update);
+router.delete('/courses/:id', adminOnly, courses.remove);
 
 // Batches — full CRUD admin only; dropdown allowed for staff (forms)
 router.get('/batches/dropdown', staffOk, batches.dropdown);
@@ -101,10 +114,13 @@ router.put('/vendors/:id', staffOk, validate(vendorSchema.partial()), vendors.up
 router.delete('/vendors/:id', staffOk, vendors.remove);
 router.get('/vendors/:id/credits', staffOk, vendors.credits);
 router.post('/vendors/:id/credits', staffOk, uploadBill.single('bill'), validate(vendorCreditSchema), vendors.addCredit);
+router.delete('/vendors/:id/credits/:creditId', staffOk, vendors.deleteCredit);
+router.put('/vendors/:id/credits/:creditId', staffOk, uploadBill.single('bill'), vendors.updateCredit);
 router.get('/vendors/:id/expenses', staffOk, vendors.expenses);
 
 // Products — staff + admin
 router.get('/products', staffOk, products.list);
+router.get('/products/summary', staffOk, products.summary);
 router.get('/products/:id', staffOk, products.get);
 router.post('/products', staffOk, validate(productSchema), products.create);
 router.put('/products/:id', staffOk, validate(productSchema.partial()), products.update);

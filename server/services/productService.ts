@@ -9,6 +9,7 @@ interface ListParams {
   search?: string;
   vendor_id?: number;
   is_active?: boolean;
+  stock_status?: 'available' | 'out_of_stock' | 'all';
 }
 
 export async function listProducts(params: ListParams) {
@@ -17,7 +18,7 @@ export async function listProducts(params: ListParams) {
   const q: Record<string, unknown> = {};
 
   if (params.search) {
-    conditions.push('(p.name LIKE :search OR p.sku LIKE :search)');
+    conditions.push('(p.name LIKE :search OR p.sku LIKE :search OR v.name LIKE :search)');
     q.search = likePattern(params.search);
   }
   if (params.vendor_id) {
@@ -28,10 +29,15 @@ export async function listProducts(params: ListParams) {
     conditions.push('p.is_active = :isActive');
     q.isActive = params.is_active ? 1 : 0;
   }
+  if (params.stock_status === 'available') {
+    conditions.push('p.quantity_available > 0');
+  } else if (params.stock_status === 'out_of_stock') {
+    conditions.push('p.quantity_available = 0');
+  }
 
   const where = conditions.join(' AND ');
   const countRow = await queryOne<RowDataPacket>(
-    `SELECT COUNT(*) AS total FROM products p WHERE ${where}`,
+    `SELECT COUNT(*) AS total FROM products p LEFT JOIN vendors v ON v.id = p.vendor_id WHERE ${where}`,
     q
   );
 
@@ -48,6 +54,35 @@ export async function listProducts(params: ListParams) {
 
   const total = Number(countRow?.total ?? 0);
   return { rows, meta: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 } };
+}
+
+export async function getProductSummary() {
+  const stockSummary = await queryOne<RowDataPacket>(
+    `SELECT
+       COALESCE(SUM(quantity_available * cost_price), 0) AS total_cost_available,
+       COALESCE(SUM(quantity_available * selling_price), 0) AS total_selling_available,
+       COALESCE(SUM(quantity_available * (selling_price - cost_price)), 0) AS total_profit_available
+     FROM products
+     WHERE deleted_at IS NULL AND is_active = 1`
+  );
+
+  const salesSummary = await queryOne<RowDataPacket>(
+    `SELECT
+       COALESCE(SUM(quantity * unit_cost_price), 0) AS total_cost_sold,
+       COALESCE(SUM(total_amount), 0) AS total_selling_sold,
+       COALESCE(SUM(total_amount - (quantity * unit_cost_price)), 0) AS total_profit_sold
+     FROM student_products
+     WHERE deleted_at IS NULL`
+  );
+
+  return {
+    total_cost_available: Number(stockSummary?.total_cost_available || 0),
+    total_selling_available: Number(stockSummary?.total_selling_available || 0),
+    total_profit_available: Number(stockSummary?.total_profit_available || 0),
+    total_cost_sold: Number(salesSummary?.total_cost_sold || 0),
+    total_selling_sold: Number(salesSummary?.total_selling_sold || 0),
+    total_profit_sold: Number(salesSummary?.total_profit_sold || 0),
+  };
 }
 
 export async function getProduct(id: number) {

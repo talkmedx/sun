@@ -47,6 +47,9 @@ export const studentSchema = z.object({
   fees_committed: z.coerce.number().min(0).optional(),
   status: z.enum(['active', 'inactive', 'completed', 'dropped']).optional(),
   notes: z.string().optional().nullable(),
+  age: z.coerce.number().int().optional().nullable(),
+  designation: z.string().max(100).optional().nullable(),
+  admission_date: z.string().optional().nullable(),
 });
 
 export const batchBaseSchema = z.object({

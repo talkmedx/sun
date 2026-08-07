@@ -18,7 +18,7 @@ export async function listAdmissions(params: ListParams) {
   const q: Record<string, unknown> = {};
 
   if (params.search) {
-    conditions.push('(a.first_name LIKE :search OR a.last_name LIKE :search OR a.phone LIKE :search)');
+    conditions.push('(a.first_name LIKE :search OR a.last_name LIKE :search OR a.phone LIKE :search OR a.city LIKE :search OR b.name LIKE :search)');
     q.search = likePattern(params.search);
   }
   if (params.status) {
@@ -28,7 +28,7 @@ export async function listAdmissions(params: ListParams) {
 
   const where = conditions.join(' AND ');
   const countRow = await queryOne<RowDataPacket>(
-    `SELECT COUNT(*) AS total FROM admissions a WHERE ${where}`,
+    `SELECT COUNT(*) AS total FROM admissions a LEFT JOIN batches b ON b.id = a.batch_id WHERE ${where}`,
     q
   );
 
@@ -48,8 +48,19 @@ export async function listAdmissions(params: ListParams) {
 
 export async function getAdmission(id: number) {
   const row = await queryOne<RowDataPacket>(
-    `SELECT a.*, b.name AS batch_name FROM admissions a
+    `SELECT a.*,
+            b.name AS batch_name,
+            b.start_date AS batch_start_date,
+            b.end_date AS batch_end_date,
+            b.course_fee AS batch_course_fee,
+            b.offer_fee AS batch_offer_fee,
+            COALESCE(s.fees_committed, b.offer_fee, b.course_fee, 0) AS fees_committed,
+            COALESCE(s.fees_paid, 0) AS fees_collected,
+            s.student_code,
+            s.id AS student_id
+     FROM admissions a
      LEFT JOIN batches b ON b.id = a.batch_id
+     LEFT JOIN students s ON (s.admission_id = a.id OR (s.phone = a.phone AND s.batch_id = a.batch_id AND s.deleted_at IS NULL))
      WHERE a.id = :id AND a.deleted_at IS NULL`,
     { id }
   );

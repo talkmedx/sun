@@ -1,6 +1,6 @@
 import { api, ApiResponse } from '@/lib/api';
 import type {
-  User, Student, Batch, Expense, Vendor, Product, Admission,
+  User, Student, Batch, Course, Expense, Vendor, Product, Admission,
   Notification, DashboardSummary, DashboardCharts,
 } from '@/types';
 
@@ -17,8 +17,8 @@ export const authApi = {
 };
 
 export const dashboardApi = {
-  summary: (batchId?: number) =>
-    api.get<ApiResponse<DashboardSummary>>('/dashboard/summary', { params: { batch_id: batchId } }),
+  summary: (batchId?: number, fy?: string) =>
+    api.get<ApiResponse<DashboardSummary>>('/dashboard/summary', { params: { batch_id: batchId, fy } }),
   charts: (batchId?: number, fy?: string) =>
     api.get<ApiResponse<DashboardCharts>>('/dashboard/charts', { params: { batch_id: batchId, fy } }),
 };
@@ -37,11 +37,19 @@ export const studentsApi = {
   fees: (id: number) => api.get(`/students/${id}/fees`),
   addFee: (id: number, data: FormData) =>
     api.post(`/students/${id}/fees`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateFee: (id: number, feeId: number, data: FormData) =>
+    api.put(`/students/${id}/fees/${feeId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteFee: (id: number, feeId: number) => api.delete(`/students/${id}/fees/${feeId}`),
   products: (id: number) => api.get(`/students/${id}/products`),
   addProduct: (id: number, data: unknown) => api.post(`/students/${id}/products`, data),
+  updateProduct: (id: number, productId: number, data: unknown) => api.put(`/students/${id}/products/${productId}`, data),
+  deleteProduct: (id: number, productId: number) => api.delete(`/students/${id}/products/${productId}`),
   documents: (id: number) => api.get(`/students/${id}/documents`),
   addDocument: (id: number, data: FormData) =>
     api.post(`/students/${id}/documents`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateDocument: (id: number, docId: number, data: FormData) =>
+    api.put(`/students/${id}/documents/${docId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteDocument: (id: number, docId: number) => api.delete(`/students/${id}/documents/${docId}`),
 };
 
 export const batchesApi = {
@@ -52,6 +60,14 @@ export const batchesApi = {
   create: (data: unknown) => api.post<ApiResponse<Batch>>('/batches', data),
   update: (id: number, data: unknown) => api.put<ApiResponse<Batch>>(`/batches/${id}`, data),
   remove: (id: number) => api.delete(`/batches/${id}`),
+};
+
+export const coursesApi = {
+  list: (params?: { search?: string }) => api.get<ApiResponse<Course[]>>('/courses', { params }),
+  get: (id: number) => api.get<ApiResponse<Course>>(`/courses/${id}`),
+  create: (data: Record<string, unknown>) => api.post<ApiResponse<Course>>('/courses', data),
+  update: (id: number, data: Record<string, unknown>) => api.put<ApiResponse<Course>>(`/courses/${id}`, data),
+  remove: (id: number) => api.delete<ApiResponse<null>>(`/courses/${id}`),
 };
 
 export const expensesApi = {
@@ -71,14 +87,30 @@ export const vendorsApi = {
   remove: (id: number) => api.delete(`/vendors/${id}`),
   credits: (id: number) => api.get(`/vendors/${id}/credits`),
   addCredit: (id: number, data: FormData | unknown) =>
-    data instanceof FormData
-      ? api.post(`/vendors/${id}/credits`, data, { headers: { 'Content-Type': 'multipart/form-data' } })
-      : api.post(`/vendors/${id}/credits`, data),
+    api.post(`/vendors/${id}/credits`, data, {
+      headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    }),
+  removeCredit: (id: number, creditId: number) => api.delete(`/vendors/${id}/credits/${creditId}`),
+  updateCredit: (id: number, creditId: number, data: FormData | unknown) =>
+    api.put(`/vendors/${id}/credits/${creditId}`, data, {
+      headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    }),
   expenses: (id: number) => api.get(`/vendors/${id}/expenses`),
 };
 
 export const productsApi = {
   list: (params?: Record<string, unknown>) => api.get<ApiResponse<Product[]>>('/products', { params }),
+  summary: () =>
+    api.get<
+      ApiResponse<{
+        total_cost_available: number;
+        total_selling_available: number;
+        total_profit_available: number;
+        total_cost_sold: number;
+        total_selling_sold: number;
+        total_profit_sold: number;
+      }>
+    >('/products/summary'),
   get: (id: number) => api.get<ApiResponse<Product>>(`/products/${id}`),
   create: (data: unknown) => api.post('/products', data),
   update: (id: number, data: unknown) => api.put(`/products/${id}`, data),

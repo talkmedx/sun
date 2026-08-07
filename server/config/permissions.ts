@@ -9,7 +9,7 @@ export const ROLES = {
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 /** Modules staff members may access */
-export const STAFF_MODULES = ['expenses', 'vendors', 'products', 'admissions'] as const;
+export const STAFF_MODULES = ['students', 'products', 'expenses', 'admissions'] as const;
 
 export type ModuleKey =
   | 'dashboard'
@@ -30,10 +30,10 @@ const ALL_ROLES: Role[] = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.STAFF];
 /** Which roles can access each API module */
 export const MODULE_ROLES: Record<ModuleKey, Role[]> = {
   dashboard: ADMIN_ROLES,
-  students: ADMIN_ROLES,
+  students: ALL_ROLES,
   batches: ADMIN_ROLES, // staff uses /batches/dropdown only (handled separately)
   expenses: ALL_ROLES,
-  vendors: ALL_ROLES,
+  vendors: ADMIN_ROLES,
   products: ALL_ROLES,
   admissions: ALL_ROLES,
   reports: ADMIN_ROLES,

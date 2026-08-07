@@ -1,22 +1,42 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { productsApi } from '@/services/api';
+import { productsApi, vendorsApi } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, Label } from '@/components/ui/input';
+import { Input, Label, Textarea } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 
 export default function ProductDetailPage() {
   const id = Number(useParams().id);
   const qc = useQueryClient();
+  
+  const [editOpen, setEditOpen] = useState(false);
+  const [stockType, setStockType] = useState<'add' | 'remove'>('add');
+
   const priceForm = useForm({ defaultValues: { cost_price: '', selling_price: '', change_reason: '' } });
   const stockForm = useForm({ defaultValues: { quantity: '1', type: 'add' as 'add' | 'remove' } });
+
+  const editForm = useForm({
+    defaultValues: {
+      name: '',
+      vendor_id: 'none',
+      cost_price: '',
+      selling_price: '',
+      quantity_available: '0',
+      sku: '',
+      description: '',
+    },
+  });
 
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', id],
@@ -26,6 +46,45 @@ export default function ProductDetailPage() {
   const { data: history } = useQuery({
     queryKey: ['product-history', id],
     queryFn: async () => (await productsApi.priceHistory(id)).data.data,
+  });
+
+  const { data: vendors } = useQuery({
+    queryKey: ['vendors-list'],
+    queryFn: async () => (await vendorsApi.list({ limit: 100 })).data.data,
+  });
+
+  const handleEditClick = () => {
+    if (!product) return;
+    editForm.reset({
+      name: product.name || '',
+      vendor_id: product.vendor_id ? String(product.vendor_id) : 'none',
+      cost_price: String(product.cost_price || ''),
+      selling_price: String(product.selling_price || ''),
+      quantity_available: String(product.quantity_available ?? '0'),
+      sku: product.sku || '',
+      description: product.description || '',
+    });
+    setEditOpen(true);
+  };
+
+  const updateProductDetails = useMutation({
+    mutationFn: (v: Record<string, string>) =>
+      productsApi.update(id, {
+        name: v.name,
+        cost_price: Number(v.cost_price),
+        selling_price: Number(v.selling_price),
+        quantity_available: Number(v.quantity_available || 0),
+        vendor_id: v.vendor_id && v.vendor_id !== 'none' ? Number(v.vendor_id) : null,
+        sku: v.sku || null,
+        description: v.description || null,
+      }),
+    onSuccess: () => {
+      toast.success('Product updated');
+      qc.invalidateQueries({ queryKey: ['product', id] });
+      qc.invalidateQueries({ queryKey: ['products-infinite'] });
+      setEditOpen(false);
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
   });
 
   const updatePrice = useMutation({
@@ -58,10 +117,60 @@ export default function ProductDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-semibold">{product.name}</h1>
-        <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'} · {product.vendor_name || 'No vendor'}</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-semibold">{product.name}</h1>
+          <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'} · {product.vendor_name || 'No vendor'}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleEditClick}>
+          <Pencil className="h-4 w-4 mr-1.5" /> Edit Product
+        </Button>
       </div>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader><DialogTitle>Edit Product Details</DialogTitle></DialogHeader>
+          <form onSubmit={editForm.handleSubmit((v) => updateProductDetails.mutate(v))} className="space-y-3">
+            <div className="space-y-1">
+              <Label>Product Name *</Label>
+              <Input {...editForm.register('name', { required: true })} />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Vendor</Label>
+              <Select
+                value={editForm.watch('vendor_id')}
+                onValueChange={(v) => editForm.setValue('vendor_id', v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {vendors?.map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label>Cost Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('cost_price', { required: true })} /></div>
+              <div className="space-y-1"><Label>Selling Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('selling_price', { required: true })} /></div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label>Quantity of units *</Label><Input type="number" {...editForm.register('quantity_available', { required: true })} /></div>
+              <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...editForm.register('sku')} /></div>
+            </div>
+
+            <div className="space-y-1"><Label>Description</Label><Textarea rows={2} {...editForm.register('description')} /></div>
+            
+            <Button type="submit" className="w-full mt-2" disabled={updateProductDetails.isPending}>
+              {updateProductDetails.isPending ? 'Updating...' : 'Save Changes'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cost</p><p className="text-xl font-semibold">{formatCurrency(product.cost_price)}</p></CardContent></Card>
@@ -94,13 +203,43 @@ export default function ProductDetailPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">Adjust Stock</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={stockForm.handleSubmit((v) => adjustStock.mutate(v))} className="space-y-3">
-              <div className="space-y-1"><Label>Quantity</Label><Input type="number" {...stockForm.register('quantity')} /></div>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => stockForm.setValue('type', 'add')}>Add</Button>
-                <Button type="button" variant="outline" onClick={() => stockForm.setValue('type', 'remove')}>Remove</Button>
+            <form onSubmit={stockForm.handleSubmit((v) => adjustStock.mutate({ ...v, type: stockType }))} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Action Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={stockType === 'add' ? 'default' : 'outline'}
+                    className={stockType === 'add' ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-medium' : ''}
+                    onClick={() => {
+                      setStockType('add');
+                      stockForm.setValue('type', 'add');
+                    }}
+                  >
+                    + Add Stock
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={stockType === 'remove' ? 'default' : 'outline'}
+                    className={stockType === 'remove' ? 'bg-red-600 hover:bg-red-700 text-white font-medium' : ''}
+                    onClick={() => {
+                      setStockType('remove');
+                      stockForm.setValue('type', 'remove');
+                    }}
+                  >
+                    - Remove Stock
+                  </Button>
+                </div>
               </div>
-              <Button type="submit">Apply ({stockForm.watch('type')})</Button>
+
+              <div className="space-y-1.5">
+                <Label>Quantity to {stockType === 'add' ? 'Add' : 'Remove'}</Label>
+                <Input type="number" min="1" {...stockForm.register('quantity', { required: true })} />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={adjustStock.isPending}>
+                {adjustStock.isPending ? 'Applying...' : `Apply (${stockType === 'add' ? '+ Add' : '- Remove'})`}
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -109,25 +248,62 @@ export default function ProductDetailPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">Price History</CardTitle></CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="pb-2">From</th><th className="pb-2">To</th><th className="pb-2">Cost</th>
-                <th className="pb-2">Sell</th><th className="pb-2">Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(history as Array<Record<string, unknown>> | undefined)?.map((h) => (
-                <tr key={String(h.id)} className="border-b border-border/50">
-                  <td className="py-2">{formatDate(String(h.effective_from))}</td>
-                  <td className="py-2">{h.effective_to ? formatDate(String(h.effective_to)) : 'Current'}</td>
-                  <td className="py-2">{formatCurrency(Number(h.cost_price))}</td>
-                  <td className="py-2">{formatCurrency(Number(h.selling_price))}</td>
-                  <td className="py-2">{String(h.change_reason || '—')}</td>
+          {/* Mobile Card View */}
+          <div className="space-y-3 block md:hidden">
+            {(history as Array<Record<string, unknown>> | undefined)?.map((h) => (
+              <div key={String(h.id)} className="rounded-lg border border-border/80 p-3 space-y-2 text-xs bg-card shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm text-emerald-600 dark:text-emerald-400">
+                    Sell: {formatCurrency(Number(h.selling_price))}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Cost: {formatCurrency(Number(h.cost_price))}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-muted-foreground pt-1 border-t border-border/50">
+                  <div>
+                    <span className="block font-medium text-foreground">Effective</span>
+                    <span>
+                      {formatDate(String(h.effective_from))} – {h.effective_to ? formatDate(String(h.effective_to)) : 'Current'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block font-medium text-foreground">Reason</span>
+                    <span className="truncate block">{String(h.change_reason || '—')}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!(history as Array<Record<string, unknown>> | undefined)?.length && (
+              <p className="py-4 text-center text-xs text-muted-foreground">No price history found</p>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2">From</th><th className="pb-2">To</th><th className="pb-2">Cost</th>
+                  <th className="pb-2">Sell</th><th className="pb-2">Reason</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(history as Array<Record<string, unknown>> | undefined)?.map((h) => (
+                  <tr key={String(h.id)} className="border-b border-border/50">
+                    <td className="py-2">{formatDate(String(h.effective_from))}</td>
+                    <td className="py-2">{h.effective_to ? formatDate(String(h.effective_to)) : 'Current'}</td>
+                    <td className="py-2">{formatCurrency(Number(h.cost_price))}</td>
+                    <td className="py-2">{formatCurrency(Number(h.selling_price))}</td>
+                    <td className="py-2">{String(h.change_reason || '—')}</td>
+                  </tr>
+                ))}
+                {!(history as Array<Record<string, unknown>> | undefined)?.length && (
+                  <tr><td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">No price history found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

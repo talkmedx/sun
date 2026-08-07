@@ -8,6 +8,7 @@ interface ListParams {
   page?: number;
   limit?: number;
   search?: string;
+  is_active?: number;
 }
 
 export async function listVendors(params: ListParams) {
@@ -18,6 +19,10 @@ export async function listVendors(params: ListParams) {
   if (params.search) {
     conditions.push('(v.name LIKE :search OR v.phone LIKE :search OR v.contact_person LIKE :search)');
     q.search = likePattern(params.search);
+  }
+  if (params.is_active !== undefined) {
+    conditions.push('v.is_active = :is_active');
+    q.is_active = Number(params.is_active);
   }
 
   const where = conditions.join(' AND ');
@@ -183,4 +188,72 @@ export async function listVendorExpenses(vendorId: number) {
      ORDER BY e.expense_date DESC`,
     { vendorId }
   );
+}
+
+export async function deleteCredit(vendorId: number, creditId: number) {
+  const credit = await queryOne<RowDataPacket>(
+    `SELECT * FROM vendor_credits WHERE id = :creditId AND vendor_id = :vendorId AND deleted_at IS NULL`,
+    { creditId, vendorId }
+  );
+  if (!credit) throw new NotFoundError('Vendor Credit');
+
+  if (credit.type === 'credit_added') {
+    await execute(
+      `UPDATE vendors SET pending_credit = GREATEST(0, pending_credit - :amount) WHERE id = :vendorId`,
+      { amount: Number(credit.amount), vendorId }
+    );
+  } else if (credit.type === 'credit_used') {
+    await execute(
+      `UPDATE vendors SET pending_credit = pending_credit + :amount WHERE id = :vendorId`,
+      { amount: Number(credit.amount), vendorId }
+    );
+  }
+
+  await execute(
+    `UPDATE vendor_credits SET deleted_at = NOW() WHERE id = :creditId`,
+    { creditId }
+  );
+}
+
+export async function updateCredit(
+  vendorId: number,
+  creditId: number,
+  data: Record<string, unknown>,
+  billUrl?: string
+) {
+  const credit = await queryOne<RowDataPacket>(
+    `SELECT * FROM vendor_credits WHERE id = :creditId AND vendor_id = :vendorId AND deleted_at IS NULL`,
+    { creditId, vendorId }
+  );
+  if (!credit) throw new NotFoundError('Vendor Credit');
+
+  const oldAmount = Number(credit.amount);
+  const newAmount = data.amount !== undefined ? Number(data.amount) : oldAmount;
+  const diff = newAmount - oldAmount;
+
+  if (diff !== 0 && credit.type === 'credit_added') {
+    await execute(
+      `UPDATE vendors SET pending_credit = GREATEST(0, pending_credit + :diff) WHERE id = :vendorId`,
+      { diff, vendorId }
+    );
+  }
+
+  await execute(
+    `UPDATE vendor_credits
+     SET amount = :amount,
+         description = :description,
+         transaction_date = :transaction_date,
+         bill_url = COALESCE(:billUrl, bill_url)
+     WHERE id = :creditId AND vendor_id = :vendorId`,
+    {
+      amount: newAmount,
+      description: data.description !== undefined ? (data.description || null) : credit.description,
+      transaction_date: data.transaction_date || credit.transaction_date,
+      billUrl: billUrl || null,
+      creditId,
+      vendorId,
+    }
+  );
+
+  return queryOne<RowDataPacket>(`SELECT * FROM vendor_credits WHERE id = :creditId`, { creditId });
 }
