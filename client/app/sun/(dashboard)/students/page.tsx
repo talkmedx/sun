@@ -320,8 +320,8 @@ export default function StudentsPage() {
                 viewMode === 'grid'
                   ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'
                   : viewMode === 'table'
-                  ? 'hidden'
-                  : 'grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden'
+                    ? 'hidden'
+                    : 'grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden'
               }>
                 {allStudents.map((s) => (
                   <div key={s.id} className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
@@ -389,8 +389,8 @@ export default function StudentsPage() {
                 viewMode === 'table'
                   ? 'overflow-x-auto'
                   : viewMode === 'grid'
-                  ? 'hidden'
-                  : 'hidden md:block overflow-x-auto'
+                    ? 'hidden'
+                    : 'hidden md:block overflow-x-auto'
               }>
                 <table className="w-full text-sm">
                   <thead>
