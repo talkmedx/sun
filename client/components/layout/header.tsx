@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Bell, Moon, Sun, LogOut, Search, Menu } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -8,12 +9,22 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore, useUIStore } from '@/store';
 import { authApi } from '@/services/api';
 import { toast } from 'sonner';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export function Header() {
   const { theme, setTheme } = useTheme();
   const { user, clearAuth } = useAuthStore();
   const { toggleMobile } = useUIStore();
   const router = useRouter();
+
+  const [headerSearch, setHeaderSearch] = useState('');
+  const debouncedHeaderSearch = useDebounce(headerSearch, 400);
+
+  useEffect(() => {
+    if (debouncedHeaderSearch.trim()) {
+      router.push(`/sun/students?search=${encodeURIComponent(debouncedHeaderSearch.trim())}`);
+    }
+  }, [debouncedHeaderSearch, router]);
 
   async function handleLogout() {
     try {
@@ -38,7 +49,12 @@ export function Header() {
 
       <div className="relative hidden max-w-sm flex-1 md:block">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Search students, vendors..." className="pl-9 bg-card/60" />
+        <Input
+          placeholder="Search students, vendors..."
+          className="pl-9 bg-card/60"
+          value={headerSearch}
+          onChange={(e) => setHeaderSearch(e.target.value)}
+        />
       </div>
 
       <div className="ml-auto flex items-center gap-2">

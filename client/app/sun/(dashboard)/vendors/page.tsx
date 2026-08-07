@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Pencil, Trash2, LayoutGrid, List, Loader2 } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { Plus, Search, Pencil, Trash2, LayoutGrid, List } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { vendorsApi } from '@/services/api';
@@ -15,15 +15,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 import { Vendor } from '@/types';
+import { Pagination } from '@/components/ui/pagination';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export default function VendorsPage() {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const form = useForm({
     defaultValues: { name: '', phone: '', email: '', contact_person: '', gstin: '', address: '', city: '' },
@@ -48,47 +56,14 @@ export default function VendorsPage() {
     setEditOpen(true);
   };
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['vendors-infinite', search],
-    queryFn: async ({ pageParam = 1 }) =>
-      (await vendorsApi.list({ search: search || undefined, page: pageParam, limit: 10 })).data,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.meta) return undefined;
-      const { page, totalPages } = lastPage.meta;
-      return page < totalPages ? page + 1 : undefined;
-    },
+  const { data: vendorsResponse, isLoading } = useQuery({
+    queryKey: ['vendors', debouncedSearch, page, limit],
+    queryFn: async () => (await vendorsApi.list({ search: debouncedSearch || undefined, page, limit })).data,
   });
 
-  const allVendors = data?.pages.flatMap((p) => p.data || []) || [];
-  const totalCount = data?.pages[0]?.meta?.total ?? 0;
-
-  // Infinite scroll
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1, rootMargin: '200px' }
-    );
-
-    const target = loadMoreRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const allVendors = vendorsResponse?.data || [];
+  const meta = vendorsResponse?.meta || { page: 1, limit: 10, total: 0, totalPages: 1 };
+  const totalCount = meta.total;
 
   const createMutation = useMutation({
     mutationFn: (v: Record<string, string>) => vendorsApi.create(v),
@@ -350,26 +325,16 @@ export default function VendorsPage() {
                 </table>
               </div>
 
-              {/* Scroll Trigger sentinel & Loading state */}
-              <div ref={loadMoreRef} className="mt-4 py-4 text-center">
-                {isFetchingNextPage ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span>Loading next 10 vendors...</span>
-                  </div>
-                ) : hasNextPage ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => fetchNextPage()}
-                  >
-                    Scroll down or click to load next 10 (Showing {allVendors.length} of {totalCount})
-                  </Button>
-                ) : allVendors.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">All {totalCount} vendors loaded</p>
-                ) : null}
-              </div>
+              {/* Pagination Controls */}
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                className="mt-4"
+              />
             </>
           )}
         </CardContent>

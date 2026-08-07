@@ -16,18 +16,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 
+import { Pagination } from '@/components/ui/pagination';
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function AdmissionsPage() {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [status, setStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   // Pop-up form states
   const [addOpen, setAddOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
 
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, status]);
 
   const addForm = useForm({
     defaultValues: {
@@ -53,52 +62,20 @@ export default function AdmissionsPage() {
     queryFn: async () => (await batchesApi.dropdown()).data.data,
   });
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['admissions-infinite', search, status],
-    queryFn: async ({ pageParam = 1 }) =>
+  const { data: admissionsResponse, isLoading } = useQuery({
+    queryKey: ['admissions', debouncedSearch, status, page, limit],
+    queryFn: async () =>
       (await admissionsApi.list({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: status === 'all' ? undefined : status,
-        page: pageParam,
-        limit: 10,
+        page,
+        limit,
       })).data,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.meta) return undefined;
-      const { page, totalPages } = lastPage.meta;
-      return page < totalPages ? page + 1 : undefined;
-    },
   });
 
-  const allAdmissions = data?.pages.flatMap((p) => p.data || []) || [];
-  const totalCount = data?.pages[0]?.meta?.total ?? 0;
-
-  // Infinite scroll
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1, rootMargin: '200px' }
-    );
-
-    const target = loadMoreRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const allAdmissions = admissionsResponse?.data || [];
+  const meta = admissionsResponse?.meta || { page: 1, limit: 10, total: 0, totalPages: 1 };
+  const totalCount = meta.total;
 
   const createAdmissionMutation = useMutation({
     mutationFn: async (v: Record<string, string>) => {
@@ -504,26 +481,16 @@ export default function AdmissionsPage() {
                 </table>
               </div>
 
-              {/* Scroll Trigger sentinel */}
-              <div ref={loadMoreRef} className="mt-4 py-4 text-center">
-                {isFetchingNextPage ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span>Loading next 10 items...</span>
-                  </div>
-                ) : hasNextPage ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => fetchNextPage()}
-                  >
-                    Scroll down or click to load next 10 (Showing {allAdmissions.length} of {totalCount})
-                  </Button>
-                ) : allAdmissions.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">All {totalCount} applications loaded</p>
-                ) : null}
-              </div>
+              {/* Pagination Controls */}
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                className="mt-4"
+              />
             </>
           )}
         </CardContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Pencil, LayoutGrid, List, Search } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -25,8 +25,12 @@ const DEFAULT_COURSES = [
   { name: 'Personal Grooming', duration_days: 30, default_fee: 15000 },
 ];
 
+import { Pagination } from '@/components/ui/pagination';
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function BatchesPage() {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [courseFilter, setCourseFilter] = useState('all');
@@ -34,7 +38,13 @@ export default function BatchesPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, activeTab, yearFilter, courseFilter]);
 
   // Fetch dynamic courses list
   const { data: dbCourses } = useQuery({
@@ -140,10 +150,10 @@ export default function BatchesPage() {
   };
 
   const { data: rawBatches, isLoading } = useQuery({
-    queryKey: ['batches', search, activeTab, yearFilter, courseFilter],
+    queryKey: ['batches', debouncedSearch, activeTab, yearFilter, courseFilter],
     queryFn: async () =>
       (await batchesApi.list({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: activeTab === 'all' ? undefined : activeTab,
         year: yearFilter === 'all' ? undefined : Number(yearFilter),
         course: courseFilter === 'all' ? undefined : courseFilter,
@@ -484,159 +494,176 @@ export default function BatchesPage() {
                 <Skeleton key={i} className="h-40" />
               ))}
             </div>
-          ) : (
-            <>
-              {/* Card View */}
-              <div className={
-                viewMode === 'grid'
-                  ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'
-                  : viewMode === 'table'
-                  ? 'hidden'
-                  : 'space-y-3 block md:hidden'
-              }>
-                {batches?.map((b) => {
-                  const m = computeBatchMetrics(b);
-                  return (
-                    <div key={b.id} className="rounded-xl border border-border/80 p-4 space-y-3 bg-card shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-base">{b.name}</h3>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatDate(b.start_date)} – {formatDate(b.end_date)}
-                          </p>
+          ) : (() => {
+            const totalCount = batches?.length || 0;
+            const totalPages = Math.ceil(totalCount / limit) || 1;
+            const paginatedBatches = batches ? batches.slice((page - 1) * limit, page * limit) : [];
+
+            return (
+              <>
+                {/* Card View */}
+                <div className={
+                  viewMode === 'grid'
+                    ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'
+                    : viewMode === 'table'
+                    ? 'hidden'
+                    : 'space-y-3 block md:hidden'
+                }>
+                  {paginatedBatches.map((b) => {
+                    const m = computeBatchMetrics(b);
+                    return (
+                      <div key={b.id} className="rounded-xl border border-border/80 p-4 space-y-3 bg-card shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-base">{b.name}</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {formatDate(b.start_date)} – {formatDate(b.end_date)}
+                            </p>
+                          </div>
+                          <Badge variant={b.status === 'ongoing' ? 'success' : b.status === 'upcoming' ? 'warning' : 'secondary'}>
+                            {b.status}
+                          </Badge>
                         </div>
-                        <Badge variant={b.status === 'ongoing' ? 'success' : b.status === 'upcoming' ? 'warning' : 'secondary'}>
-                          {b.status}
-                        </Badge>
-                      </div>
 
-                      <div className="space-y-1.5 text-xs text-muted-foreground pt-2 border-t border-border/50">
-                        <div className="flex justify-between"><span>Course fee</span><span className="text-foreground font-medium">{formatCurrency(m.courseFee)}</span></div>
-                        {m.offerFee != null && (
-                          <div className="flex justify-between"><span>Offer</span><span className="text-foreground font-medium">{formatCurrency(m.offerFee)}</span></div>
-                        )}
-                        <div className="flex justify-between"><span>Students</span><span className="text-foreground font-medium">{m.studentCount}</span></div>
-                        <div className="flex justify-between"><span>Fees Collected</span><span className="text-foreground font-medium">{formatCurrency(m.feesCollected)}</span></div>
-                        <div className="flex justify-between"><span>Batch Revenue</span><span className="text-foreground font-medium">{formatCurrency(m.batchRevenue)}</span></div>
-                        <div className="flex justify-between"><span>Batch Offer Expense</span><span className="text-foreground font-medium">{formatCurrency(m.batchOfferExpense)}</span></div>
-                        <div className="flex justify-between font-medium"><span>Fees Profit</span><span className="text-foreground">{formatCurrency(m.feesProfit)}</span></div>
-                        <div className="flex justify-between"><span>Product Profits</span><span className="text-foreground font-medium">{formatCurrency(m.productProfit)}</span></div>
-                        <div className="flex justify-between"><span>Expenses</span><span className="text-foreground font-medium">{formatCurrency(m.expenses)}</span></div>
-                        <div className="flex justify-between font-bold text-sm pt-1 border-t border-border/40">
-                          <span className="text-foreground">Total Batch Profit</span>
-                          <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(m.totalBatchProfit)}</span>
+                        <div className="space-y-1.5 text-xs text-muted-foreground pt-1">
+                          <div className="flex justify-between">
+                            <span>Students:</span>
+                            <span className="font-medium text-foreground">{m.studentCount}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Fees Collected:</span>
+                            <span className="font-medium text-foreground">{formatCurrency(m.feesCollected)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Offer Expense:</span>
+                            <span className="text-amber-700 dark:text-amber-400 font-medium">{formatCurrency(m.batchOfferExpense)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Product Profits:</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">{formatCurrency(m.productProfit)}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold border-t pt-1">
+                            <span className="text-foreground">Total Batch Profit:</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(m.totalBatchProfit)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleEditClick(b)}>
+                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (confirm('Delete this batch? Blocked if students exist.')) deleteMutation.mutate(b.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                          </Button>
                         </div>
                       </div>
+                    );
+                  })}
+                  {!paginatedBatches.length && (
+                    <p className="py-8 text-center text-xs text-muted-foreground col-span-full">No batches found</p>
+                  )}
+                </div>
 
-                      <div className="flex gap-2 pt-2 border-t border-border/50">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-xs h-8"
-                          onClick={() => handleEditClick(b)}
-                        >
-                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-xs h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            if (confirm('Delete this batch? Blocked if students exist.')) deleteMutation.mutate(b.id);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {!batches?.length && (
-                  <p className="py-8 text-center text-xs text-muted-foreground col-span-full">No batches found</p>
-                )}
-              </div>
+                {/* Table View */}
+                <div className={
+                  viewMode === 'table'
+                    ? 'overflow-x-auto border rounded-lg'
+                    : viewMode === 'grid'
+                    ? 'hidden'
+                    : 'hidden md:block overflow-x-auto border rounded-lg'
+                }>
+                  <table className="w-full min-w-[1300px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Batch Name</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Start – End Date</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Status</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Course / Offer</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Students</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Fees Collected</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Batch Revenue</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Offer Expense</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Fees Profit</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Product Profits</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Expenses</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Total Batch Profit</th>
+                        <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedBatches.map((b) => {
+                        const m = computeBatchMetrics(b);
+                        return (
+                          <tr key={b.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                            <td className="px-3 py-2.5 font-medium whitespace-nowrap">{b.name}</td>
+                            <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                              {formatDate(b.start_date)} – {formatDate(b.end_date)}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              <Badge variant={b.status === 'ongoing' ? 'success' : b.status === 'upcoming' ? 'warning' : 'secondary'}>
+                                {b.status}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                              <div>{formatCurrency(m.courseFee)}</div>
+                              {m.offerFee != null && <div className="text-muted-foreground font-mono">Offer: {formatCurrency(m.offerFee)}</div>}
+                            </td>
+                            <td className="px-3 py-2.5 font-medium whitespace-nowrap">{m.studentCount}</td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.feesCollected)}</td>
+                            <td className="px-3 py-2.5 font-medium whitespace-nowrap">{formatCurrency(m.batchRevenue)}</td>
+                            <td className="px-3 py-2.5 text-amber-700 dark:text-amber-400 whitespace-nowrap">{formatCurrency(m.batchOfferExpense)}</td>
+                            <td className="px-3 py-2.5 font-medium whitespace-nowrap">{formatCurrency(m.feesProfit)}</td>
+                            <td className="px-3 py-2.5 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatCurrency(m.productProfit)}</td>
+                            <td className="px-3 py-2.5 text-red-600 dark:text-red-400 whitespace-nowrap">{formatCurrency(m.expenses)}</td>
+                            <td className="px-3 py-2.5 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatCurrency(m.totalBatchProfit)}</td>
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" title="Edit batch" onClick={() => handleEditClick(b)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  title="Delete batch"
+                                  onClick={() => {
+                                    if (confirm('Delete this batch? Blocked if students exist.')) deleteMutation.mutate(b.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {!paginatedBatches.length && (
+                        <tr><td colSpan={13} className="py-8 text-center text-xs text-muted-foreground">No batches found</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
-              {/* Table View */}
-              <div className={
-                viewMode === 'table'
-                  ? 'overflow-x-auto border rounded-lg'
-                  : viewMode === 'grid'
-                  ? 'hidden'
-                  : 'hidden md:block overflow-x-auto border rounded-lg'
-              }>
-                <table className="w-full min-w-[1300px] text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Batch Name</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Start – End Date</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Status</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Course / Offer</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Students</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Fees Collected</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Batch Revenue</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Offer Expense</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Fees Profit</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Product Profits</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Expenses</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Total Batch Profit</th>
-                      <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batches?.map((b) => {
-                      const m = computeBatchMetrics(b);
-                      return (
-                        <tr key={b.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                          <td className="px-3 py-2.5 font-medium whitespace-nowrap">{b.name}</td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDate(b.start_date)} – {formatDate(b.end_date)}
-                          </td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">
-                            <Badge variant={b.status === 'ongoing' ? 'success' : b.status === 'upcoming' ? 'warning' : 'secondary'}>
-                              {b.status}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2.5 text-xs whitespace-nowrap">
-                            <div>{formatCurrency(m.courseFee)}</div>
-                            {m.offerFee != null && <div className="text-muted-foreground font-mono">Offer: {formatCurrency(m.offerFee)}</div>}
-                          </td>
-                          <td className="px-3 py-2.5 font-medium whitespace-nowrap">{m.studentCount}</td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.feesCollected)}</td>
-                          <td className="px-3 py-2.5 font-medium whitespace-nowrap">{formatCurrency(m.batchRevenue)}</td>
-                          <td className="px-3 py-2.5 text-amber-700 dark:text-amber-400 whitespace-nowrap">{formatCurrency(m.batchOfferExpense)}</td>
-                          <td className="px-3 py-2.5 font-medium whitespace-nowrap">{formatCurrency(m.feesProfit)}</td>
-                          <td className="px-3 py-2.5 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatCurrency(m.productProfit)}</td>
-                          <td className="px-3 py-2.5 text-red-600 dark:text-red-400 whitespace-nowrap">{formatCurrency(m.expenses)}</td>
-                          <td className="px-3 py-2.5 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{formatCurrency(m.totalBatchProfit)}</td>
-                          <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" title="Edit batch" onClick={() => handleEditClick(b)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                title="Delete batch"
-                                onClick={() => {
-                                  if (confirm('Delete this batch? Blocked if students exist.')) deleteMutation.mutate(b.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {!batches?.length && (
-                      <tr><td colSpan={13} className="py-8 text-center text-xs text-muted-foreground">No batches found</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+                {/* Pagination Controls */}
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  total={totalCount}
+                  limit={limit}
+                  onPageChange={setPage}
+                  onLimitChange={setLimit}
+                  className="mt-4"
+                />
+              </>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>

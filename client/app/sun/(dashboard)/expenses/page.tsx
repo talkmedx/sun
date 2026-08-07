@@ -16,8 +16,12 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 import { Expense } from '@/types';
 
+import { Pagination } from '@/components/ui/pagination';
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function ExpensesPage() {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [batchId, setBatchId] = useState('all');
   const [vendorId, setVendorId] = useState('all');
   const [financialYear, setFinancialYear] = useState('all');
@@ -32,8 +36,13 @@ export default function ExpensesPage() {
   const [editProofFile, setEditProofFile] = useState<File | null>(null);
 
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, batchId, vendorId, financialYear, startDate, endDate]);
 
   const form = useForm({
     defaultValues: {
@@ -87,56 +96,24 @@ export default function ExpensesPage() {
     queryFn: async () => (await vendorsApi.list({ limit: 100 })).data.data,
   });
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['expenses-infinite', search, batchId, vendorId, financialYear, startDate, endDate],
-    queryFn: async ({ pageParam = 1 }) =>
+  const { data: expensesResponse, isLoading } = useQuery({
+    queryKey: ['expenses', debouncedSearch, batchId, vendorId, financialYear, startDate, endDate, page, limit],
+    queryFn: async () =>
       (await expensesApi.list({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         batch_id: batchId === 'all' ? undefined : batchId,
         vendor_id: vendorId === 'all' ? undefined : vendorId,
         financial_year: financialYear === 'all' ? undefined : financialYear,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
-        page: pageParam,
-        limit: 10,
+        page,
+        limit,
       })).data,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.meta) return undefined;
-      const { page, totalPages } = lastPage.meta;
-      return page < totalPages ? page + 1 : undefined;
-    },
   });
 
-  const allExpenses = data?.pages.flatMap((p) => p.data || []) || [];
-  const totalCount = data?.pages[0]?.meta?.total ?? 0;
-
-  // Infinite scroll
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1, rootMargin: '200px' }
-    );
-
-    const target = loadMoreRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const allExpenses = expensesResponse?.data || [];
+  const meta = expensesResponse?.meta || { page: 1, limit: 10, total: 0, totalPages: 1 };
+  const totalCount = meta.total;
 
   const createMutation = useMutation({
     mutationFn: (v: Record<string, string>) => {
@@ -672,18 +649,16 @@ export default function ExpensesPage() {
                 </table>
               </div>
 
-              {/* Infinite Scroll target */}
-              <div ref={loadMoreRef} className="py-4 text-center text-xs text-muted-foreground">
-                {isFetchingNextPage ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading more expenses...
-                  </div>
-                ) : hasNextPage ? (
-                  'Scroll down to load more'
-                ) : (
-                  totalCount > 0 && `All ${totalCount} expenses loaded`
-                )}
-              </div>
+              {/* Pagination Controls */}
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                className="mt-4"
+              />
             </>
           )}
         </CardContent>

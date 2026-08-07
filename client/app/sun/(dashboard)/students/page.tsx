@@ -18,6 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 
+import { Pagination } from '@/components/ui/pagination';
+import { useDebounce } from '@/hooks/useDebounce';
+
 const schema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().optional(),
@@ -33,11 +36,17 @@ const schema = z.object({
 
 export default function StudentsPage() {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [batchId, setBatchId] = useState('all');
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, batchId]);
 
   const { data: batches } = useQuery({
     queryKey: ['batches-dropdown'],
@@ -50,52 +59,20 @@ export default function StudentsPage() {
     enabled: batchId !== 'all',
   });
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['students-infinite', search, batchId],
-    queryFn: async ({ pageParam = 1 }) =>
+  const { data: studentsResponse, isLoading } = useQuery({
+    queryKey: ['students', debouncedSearch, batchId, page, limit],
+    queryFn: async () =>
       (await studentsApi.list({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         batch_id: batchId === 'all' ? undefined : batchId,
-        page: pageParam,
-        limit: 10,
+        page,
+        limit,
       })).data,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.meta) return undefined;
-      const { page, totalPages } = lastPage.meta;
-      return page < totalPages ? page + 1 : undefined;
-    },
   });
 
-  const allStudents = data?.pages.flatMap((p) => p.data || []) || [];
-  const totalCount = data?.pages[0]?.meta?.total ?? 0;
-
-  // Infinite scroll on scroll down
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1, rootMargin: '200px' }
-    );
-
-    const target = loadMoreRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const allStudents = studentsResponse?.data || [];
+  const meta = studentsResponse?.meta || { page: 1, limit: 10, total: 0, totalPages: 1 };
+  const totalCount = meta.total;
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -467,26 +444,16 @@ export default function StudentsPage() {
                 </table>
               </div>
 
-              {/* Scroll Trigger sentinel & Loading state for infinite scroll */}
-              <div ref={loadMoreRef} className="mt-4 py-4 text-center">
-                {isFetchingNextPage ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span>Loading next 10 cards...</span>
-                  </div>
-                ) : hasNextPage ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => fetchNextPage()}
-                  >
-                    Scroll down or click to load next 10 cards (Showing {allStudents.length} of {totalCount})
-                  </Button>
-                ) : allStudents.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">All {totalCount} students loaded</p>
-                ) : null}
-              </div>
+              {/* Pagination Controls */}
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                className="mt-4"
+              />
             </>
           )}
         </CardContent>

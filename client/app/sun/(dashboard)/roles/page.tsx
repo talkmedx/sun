@@ -30,16 +30,20 @@ const roleLabel = (role: string) => {
   return role;
 };
 
+import { Pagination } from '@/components/ui/pagination';
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function RolesPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [roleFilter, setRoleFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
-  const [visibleCount, setVisibleCount] = useState(10);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   useEffect(() => {
     if (user && !isSuperAdmin(user.role)) {
@@ -60,41 +64,21 @@ export default function RolesPage() {
   // Filter users based on search and role
   const filteredUsers = (users || []).filter((u) => {
     const matchesSearch =
-      !search ||
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase());
+      !debouncedSearch ||
+      u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(debouncedSearch.toLowerCase());
     const matchesRole = roleFilter === 'all' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
 
-  const displayedUsers = filteredUsers.slice(0, visibleCount);
-  const hasNextPage = visibleCount < filteredUsers.length;
+  const totalCount = filteredUsers.length;
+  const totalPages = Math.ceil(totalCount / limit) || 1;
+  const displayedUsers = filteredUsers.slice((page - 1) * limit, page * limit);
 
-  // Reset pagination on filter change
+  // Reset page on filter change
   useEffect(() => {
-    setVisibleCount(10);
-  }, [search, roleFilter]);
-
-  // Infinite scroll listener
-  useEffect(() => {
-    if (!hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage) {
-          setVisibleCount((prev) => Math.min(prev + 10, filteredUsers.length));
-        }
-      },
-      { threshold: 0.1, rootMargin: '200px' }
-    );
-
-    const target = loadMoreRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [hasNextPage, filteredUsers.length]);
+    setPage(1);
+  }, [debouncedSearch, roleFilter]);
 
   const createUser = useMutation({
     mutationFn: (v: {
@@ -437,21 +421,16 @@ export default function RolesPage() {
                 </table>
               </div>
 
-              {/* Scroll Trigger sentinel & Loading state */}
-              <div ref={loadMoreRef} className="mt-4 py-4 text-center">
-                {hasNextPage ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => setVisibleCount((prev) => Math.min(prev + 10, filteredUsers.length))}
-                  >
-                    Scroll down or click to load next 10 (Showing {displayedUsers.length} of {filteredUsers.length})
-                  </Button>
-                ) : displayedUsers.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">All {filteredUsers.length} users loaded</p>
-                ) : null}
-              </div>
+              {/* Pagination Controls */}
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={totalCount}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                className="mt-4"
+              />
             </>
           )}
         </CardContent>
