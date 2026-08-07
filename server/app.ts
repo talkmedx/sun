@@ -30,6 +30,7 @@ app.use(
     max: config.rateLimit.max,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { trustProxy: false },
     message: { success: false, message: 'Too many requests, please try again later' },
   })
 );
