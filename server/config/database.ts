@@ -70,7 +70,8 @@ export async function testConnection(): Promise<boolean> {
     await conn.ping();
     conn.release();
     return true;
-  } catch {
+  } catch (err) {
+    console.error('❌ Database connection error detail:', (err as Error).message);
     return false;
   }
 }
