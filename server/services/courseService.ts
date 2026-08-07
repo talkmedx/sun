@@ -3,43 +3,55 @@ import { query, queryOne, execute } from '../config/database';
 import { NotFoundError, ConflictError } from '../utils/errors';
 import { likePattern } from '../helpers/queryHelpers';
 
-async function ensureTable() {
-  await execute(`
-    CREATE TABLE IF NOT EXISTS courses (
-      id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      name            VARCHAR(200)    NOT NULL,
-      duration_days   INT UNSIGNED    NOT NULL DEFAULT 90,
-      default_fee     DECIMAL(12,2)   NULL,
-      description     TEXT            NULL,
-      is_active       TINYINT(1)      NOT NULL DEFAULT 1,
-      created_by      BIGINT UNSIGNED NULL,
-      created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      deleted_at      DATETIME        NULL,
-      PRIMARY KEY (id),
-      UNIQUE KEY uq_courses_name (name),
-      KEY idx_courses_active (is_active),
-      KEY idx_courses_deleted (deleted_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-  `);
+let ensureTablePromise: Promise<void> | null = null;
 
-  const count = await queryOne<RowDataPacket>(`SELECT COUNT(*) as total FROM courses WHERE deleted_at IS NULL`);
-  if (count && count.total === 0) {
-    const defaultCourses = [
-      { name: 'Nail Art', duration_days: 60, default_fee: 25000, description: 'Complete Nail Art & Extensions Training' },
-      { name: 'Hair Styling', duration_days: 75, default_fee: 35000, description: 'Professional Hair Styling & Treatments' },
-      { name: 'Professional Makeup', duration_days: 90, default_fee: 55000, description: 'Masterclass in HD & Airbrush Makeup' },
-      { name: 'Bridal Makeup', duration_days: 90, default_fee: 45000, description: 'Advanced Bridal Artistry & Styling' },
-      { name: 'Cosmetology', duration_days: 180, default_fee: 85000, description: 'Comprehensive Beauty & Skincare Science' },
-      { name: 'Personal Grooming', duration_days: 30, default_fee: 15000, description: 'Self Grooming & Everyday Makeup' },
-    ];
-    for (const c of defaultCourses) {
-      await execute(
-        `INSERT INTO courses (name, duration_days, default_fee, description) VALUES (:name, :duration_days, :default_fee, :description) ON DUPLICATE KEY UPDATE name=name`,
-        c
-      );
-    }
+async function ensureTable() {
+  if (!ensureTablePromise) {
+    ensureTablePromise = (async () => {
+      try {
+        await execute(`
+          CREATE TABLE IF NOT EXISTS courses (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name            VARCHAR(200)    NOT NULL,
+            duration_days   INT UNSIGNED    NOT NULL DEFAULT 90,
+            default_fee     DECIMAL(12,2)   NULL,
+            description     TEXT            NULL,
+            is_active       TINYINT(1)      NOT NULL DEFAULT 1,
+            created_by      BIGINT UNSIGNED NULL,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            deleted_at      DATETIME        NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_courses_name (name),
+            KEY idx_courses_active (is_active),
+            KEY idx_courses_deleted (deleted_at)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        const count = await queryOne<RowDataPacket>(`SELECT COUNT(*) as total FROM courses WHERE deleted_at IS NULL`);
+        if (count && Number(count.total) === 0) {
+          const defaultCourses = [
+            { name: 'Nail Art', duration_days: 60, default_fee: 25000, description: 'Complete Nail Art & Extensions Training' },
+            { name: 'Hair Styling', duration_days: 75, default_fee: 35000, description: 'Professional Hair Styling & Treatments' },
+            { name: 'Professional Makeup', duration_days: 90, default_fee: 55000, description: 'Masterclass in HD & Airbrush Makeup' },
+            { name: 'Bridal Makeup', duration_days: 90, default_fee: 45000, description: 'Advanced Bridal Artistry & Styling' },
+            { name: 'Cosmetology', duration_days: 180, default_fee: 85000, description: 'Comprehensive Beauty & Skincare Science' },
+            { name: 'Personal Grooming', duration_days: 30, default_fee: 15000, description: 'Self Grooming & Everyday Makeup' },
+          ];
+          for (const c of defaultCourses) {
+            await execute(
+              `INSERT INTO courses (name, duration_days, default_fee, description) VALUES (:name, :duration_days, :default_fee, :description) ON DUPLICATE KEY UPDATE name=name`,
+              c
+            );
+          }
+        }
+      } catch (err) {
+        ensureTablePromise = null;
+        throw err;
+      }
+    })();
   }
+  return ensureTablePromise;
 }
 
 export async function listCourses(search?: string) {
