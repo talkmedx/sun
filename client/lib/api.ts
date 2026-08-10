@@ -69,7 +69,19 @@ export interface ApiResponse<T> {
 
 export function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
-    return (err.response?.data as { message?: string })?.message || err.message;
+    const data = err.response?.data as {
+      message?: string;
+      errors?: Array<{ field?: string; message?: string } | string>;
+    };
+    if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+      const messages = data.errors
+        .map((e) => (typeof e === 'string' ? e : e.message))
+        .filter((m): m is string => Boolean(m));
+      if (messages.length > 0) {
+        return messages.join(', ');
+      }
+    }
+    return data?.message || err.message;
   }
   if (err instanceof Error) return err.message;
   return 'Something went wrong';

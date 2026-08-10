@@ -69,7 +69,7 @@ export default function VendorsPage() {
     mutationFn: (v: Record<string, string>) => vendorsApi.create(v),
     onSuccess: () => {
       toast.success('Vendor created');
-      qc.invalidateQueries({ queryKey: ['vendors-infinite'] });
+      qc.invalidateQueries({ queryKey: ['vendors'] });
       setOpen(false);
       form.reset();
     },
@@ -83,7 +83,7 @@ export default function VendorsPage() {
     },
     onSuccess: () => {
       toast.success('Vendor updated');
-      qc.invalidateQueries({ queryKey: ['vendors-infinite'] });
+      qc.invalidateQueries({ queryKey: ['vendors'] });
       setEditOpen(false);
       setEditingVendor(null);
     },
@@ -94,7 +94,7 @@ export default function VendorsPage() {
     mutationFn: (id: number) => vendorsApi.remove(id),
     onSuccess: () => {
       toast.success('Vendor deleted');
-      qc.invalidateQueries({ queryKey: ['vendors-infinite'] });
+      qc.invalidateQueries({ queryKey: ['vendors'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -112,7 +112,19 @@ export default function VendorsPage() {
             <DialogHeader><DialogTitle>New Vendor</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-3">
               <div className="space-y-1"><Label>Name</Label><Input {...form.register('name', { required: true })} /></div>
-              <div className="space-y-1"><Label>Phone</Label><Input {...form.register('phone', { required: true })} /></div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="10-digit mobile"
+                  {...form.register('phone', { required: true })}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    form.setValue('phone', val, { shouldValidate: true });
+                  }}
+                />
+              </div>
               <div className="space-y-1"><Label>Contact person</Label><Input {...form.register('contact_person')} /></div>
               <div className="space-y-1"><Label>Email</Label><Input {...form.register('email')} /></div>
               <div className="space-y-1"><Label>GST Number</Label><Input placeholder="e.g. 27AAAAA0000A1Z5" {...form.register('gstin')} /></div>
@@ -129,7 +141,19 @@ export default function VendorsPage() {
             <DialogHeader><DialogTitle>Edit Vendor</DialogTitle></DialogHeader>
             <form onSubmit={editForm.handleSubmit((v) => updateMutation.mutate(v))} className="space-y-3">
               <div className="space-y-1"><Label>Name</Label><Input {...editForm.register('name', { required: true })} /></div>
-              <div className="space-y-1"><Label>Phone</Label><Input {...editForm.register('phone', { required: true })} /></div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="10-digit mobile"
+                  {...editForm.register('phone', { required: true })}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    editForm.setValue('phone', val, { shouldValidate: true });
+                  }}
+                />
+              </div>
               <div className="space-y-1"><Label>Contact person</Label><Input {...editForm.register('contact_person')} /></div>
               <div className="space-y-1"><Label>Email</Label><Input {...editForm.register('email')} /></div>
               <div className="space-y-1"><Label>GST Number</Label><Input placeholder="e.g. 27AAAAA0000A1Z5" {...editForm.register('gstin')} /></div>

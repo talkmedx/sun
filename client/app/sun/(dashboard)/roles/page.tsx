@@ -161,7 +161,16 @@ export default function RolesPage() {
               </div>
               <div className="space-y-1">
                 <Label>Phone</Label>
-                <Input {...form.register('phone')} />
+                <Input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="10-digit mobile"
+                  {...form.register('phone')}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    form.setValue('phone', val, { shouldValidate: true });
+                  }}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Password</Label>

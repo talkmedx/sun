@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,18 +8,23 @@ import { admissionsApi } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge, Skeleton } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input, Label, Textarea } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/api';
 import {
   User, Phone, Mail, MapPin, Calendar, Layers, FileText, CheckCircle2,
-  XCircle, Link2, ExternalLink, IndianRupee, ShieldCheck, ArrowLeft
+  XCircle, Link2, ExternalLink, IndianRupee, ShieldCheck, ArrowLeft, AlertCircle, Loader2
 } from 'lucide-react';
 
 export default function AdmissionDetailPage() {
   const id = Number(useParams().id);
   const router = useRouter();
   const qc = useQueryClient();
+
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const { data: a, isLoading } = useQuery({
     queryKey: ['admission', id],
@@ -30,22 +36,22 @@ export default function AdmissionDetailPage() {
     onSuccess: () => {
       toast.success('Admission approved — student record created');
       qc.invalidateQueries({ queryKey: ['admission', id] });
-      qc.invalidateQueries({ queryKey: ['admissions-infinite'] });
+      qc.invalidateQueries({ queryKey: ['admissions'] });
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
   const reject = useMutation({
-    mutationFn: (id: number) => {
-      const reason = prompt('Rejection reason:') || 'Not eligible';
-      return admissionsApi.reject(id, reason);
-    },
+    mutationFn: (reason: string) => admissionsApi.reject(id, reason),
     onSuccess: () => {
-      toast.success('Admission rejected');
+      toast.success('Admission application rejected');
       qc.invalidateQueries({ queryKey: ['admission', id] });
-      qc.invalidateQueries({ queryKey: ['admissions-infinite'] });
+      qc.invalidateQueries({ queryKey: ['admissions'] });
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
+      setRejectOpen(false);
+      setRejectionReason('');
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -130,7 +136,10 @@ export default function AdmissionDetailPage() {
                 size="sm"
                 variant="outline"
                 className="text-destructive hover:bg-destructive/10"
-                onClick={() => reject.mutate(a.id)}
+                onClick={() => {
+                  setRejectionReason('');
+                  setRejectOpen(true);
+                }}
                 disabled={reject.isPending}
               >
                 <XCircle className="h-4 w-4 mr-1.5" /> Reject
@@ -338,6 +347,76 @@ export default function AdmissionDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Reject Admission Application Dialog Modal */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2 text-base font-semibold">
+              <AlertCircle className="h-5 w-5" />
+              Reject Admission Application
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Please specify a reason for rejecting the admission application for <strong className="text-foreground">{a.first_name} {a.last_name || ''}</strong>.
+            </p>
+
+            {/* Quick suggestion pills */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Quick reasons</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Seat unavailable in batch',
+                  'Incomplete documentation',
+                  'Does not meet eligibility',
+                  'Cancelled by applicant',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRejectionReason(preset)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      rejectionReason === preset
+                        ? 'border-destructive bg-destructive/10 text-destructive font-medium'
+                        : 'border-border bg-muted/40 hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Rejection Reason *</Label>
+              <Textarea
+                placeholder="Enter detailed reason for rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+                className="text-xs sm:text-sm resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => setRejectOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={reject.isPending || !rejectionReason.trim()}
+              onClick={() => {
+                reject.mutate(rejectionReason.trim());
+              }}
+            >
+              {reject.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Confirm Rejection
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

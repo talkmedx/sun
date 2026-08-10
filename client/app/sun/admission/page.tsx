@@ -83,7 +83,19 @@ export default function PublicAdmissionPage() {
                 <div className="space-y-1"><Label>First name *</Label><Input {...form.register('first_name', { required: true })} /></div>
                 <div className="space-y-1"><Label>Last name</Label><Input {...form.register('last_name')} /></div>
               </div>
-              <div className="space-y-1"><Label>Phone *</Label><Input type="tel" {...form.register('phone', { required: true })} /></div>
+              <div className="space-y-1">
+                <Label>Phone *</Label>
+                <Input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="10-digit mobile number"
+                  {...form.register('phone', { required: true })}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    form.setValue('phone', val, { shouldValidate: true });
+                  }}
+                />
+              </div>
               <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register('email')} /></div>
               <div className="space-y-1"><Label>Address</Label><Input {...form.register('address_line1')} /></div>
               <div className="grid grid-cols-2 gap-3">

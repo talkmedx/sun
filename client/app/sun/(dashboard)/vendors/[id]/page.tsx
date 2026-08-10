@@ -95,7 +95,7 @@ export default function VendorDetailPage() {
     onSuccess: () => {
       toast.success(`Vendor marked ${vendor?.is_active ? 'Inactive' : 'Active'}`);
       qc.invalidateQueries({ queryKey: ['vendor', id] });
-      qc.invalidateQueries({ queryKey: ['vendors-infinite'] });
+      qc.invalidateQueries({ queryKey: ['vendors'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -268,7 +268,7 @@ export default function VendorDetailPage() {
     onSuccess: () => {
       toast.success('Vendor updated');
       qc.invalidateQueries({ queryKey: ['vendor', id] });
-      qc.invalidateQueries({ queryKey: ['vendors-infinite'] });
+      qc.invalidateQueries({ queryKey: ['vendors'] });
       setEditVendorOpen(false);
     },
     onError: (e) => toast.error(getErrorMessage(e)),

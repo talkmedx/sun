@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -35,6 +35,17 @@ export default function StudentProfilePage() {
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setProductDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Edit Student Dialog state
   const [editStudentOpen, setEditStudentOpen] = useState(false);
@@ -192,6 +203,7 @@ export default function StudentProfilePage() {
     onSuccess: () => {
       toast.success('Student details updated');
       qc.invalidateQueries({ queryKey: ['student', id] });
+      qc.invalidateQueries({ queryKey: ['students'] });
       setEditStudentOpen(false);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
@@ -493,7 +505,19 @@ export default function StudentProfilePage() {
               <div className="space-y-1"><Label>Last name</Label><Input {...editStudentForm.register('last_name')} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Phone *</Label><Input {...editStudentForm.register('phone')} /></div>
+              <div className="space-y-1">
+                <Label>Phone *</Label>
+                <Input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="10-digit mobile"
+                  {...editStudentForm.register('phone')}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    editStudentForm.setValue('phone', val, { shouldValidate: true });
+                  }}
+                />
+              </div>
               <div className="space-y-1"><Label>Email</Label><Input {...editStudentForm.register('email')} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -1249,13 +1273,17 @@ export default function StudentProfilePage() {
                     className="grid gap-3 sm:grid-cols-4"
                   >
                     {/* Searchable Product Selection Combobox */}
-                    <div className="space-y-1 sm:col-span-2 relative">
+                    <div className="space-y-1 sm:col-span-2 relative" ref={productDropdownRef}>
                       <Label className="text-xs font-medium">Select Product *</Label>
                       <div className="relative">
                         <Input
                           type="text"
                           placeholder="Search product name, SKU or vendor..."
-                          value={selectedProduct ? `${selectedProduct.name} (${formatCurrency(selectedProduct.selling_price)})` : productSearch}
+                          value={
+                            selectedProduct
+                              ? `${selectedProduct.name} (${formatCurrency(selectedProduct.selling_price)})`
+                              : productSearch
+                          }
                           onChange={(e) => {
                             setProductSearch(e.target.value);
                             setSelectedProduct(null);
@@ -1263,17 +1291,18 @@ export default function StudentProfilePage() {
                             setProductDropdownOpen(true);
                           }}
                           onFocus={() => setProductDropdownOpen(true)}
-                          className="w-full pr-8 text-xs sm:text-sm"
+                          className="w-full pr-8 text-xs sm:text-sm bg-background"
                         />
-                        {selectedProduct && (
+                        {(selectedProduct || productSearch) && (
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedProduct(null);
                               setProductSearch('');
                               productForm.setValue('product_id', '');
+                              setProductDropdownOpen(false);
                             }}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 text-xs"
                           >
                             ✕
                           </button>
@@ -1282,7 +1311,7 @@ export default function StudentProfilePage() {
 
                       {/* Search Results Dropdown List */}
                       {productDropdownOpen && (
-                        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-xl py-1">
+                        <div className="absolute left-0 top-full z-[100] mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-border/80 bg-white dark:bg-zinc-950 text-foreground shadow-2xl py-1 ring-1 ring-black/10 dark:ring-white/10">
                           {filteredProducts.length > 0 ? (
                             filteredProducts.map((p) => (
                               <div
@@ -1292,15 +1321,17 @@ export default function StudentProfilePage() {
                                   productForm.setValue('product_id', String(p.id));
                                   setProductDropdownOpen(false);
                                 }}
-                                className="px-3.5 py-2.5 text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer border-b border-border/40 last:border-0 transition-colors"
+                                className="px-3.5 py-2.5 text-xs hover:bg-accent/80 hover:text-accent-foreground cursor-pointer border-b border-border/30 last:border-0 transition-colors"
                               >
                                 <div className="flex items-center justify-between font-semibold text-foreground">
-                                  <span>{p.name}</span>
-                                  <span className="font-bold text-primary">{formatCurrency(p.selling_price)}</span>
+                                  <span className="truncate pr-2">{p.name}</span>
+                                  <span className="font-bold text-primary shrink-0">{formatCurrency(p.selling_price)}</span>
                                 </div>
-                                <div style={{ color: '#666666' }} className="text-[11px] mt-0.5 flex justify-between font-normal">
-                                  <span>Vendor: {p.vendor_name || 'None'}</span>
-                                  <span>Stock: {p.quantity_available}</span>
+                                <div className="text-[11px] text-muted-foreground mt-1 flex items-center justify-between font-normal">
+                                  <span className="truncate">Vendor: {p.vendor_name || 'None'}</span>
+                                  <span className={p.quantity_available > 0 ? "font-medium text-emerald-600 dark:text-emerald-400 shrink-0 ml-2" : "font-medium text-destructive shrink-0 ml-2"}>
+                                    Stock: {p.quantity_available}
+                                  </span>
                                 </div>
                               </div>
                             ))

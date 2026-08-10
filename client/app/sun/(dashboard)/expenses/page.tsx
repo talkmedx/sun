@@ -133,7 +133,7 @@ export default function ExpensesPage() {
     },
     onSuccess: () => {
       toast.success('Expense added');
-      qc.invalidateQueries({ queryKey: ['expenses-infinite'] });
+      qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['vendors'] });
       setOpen(false);
       form.reset({
@@ -165,7 +165,7 @@ export default function ExpensesPage() {
     },
     onSuccess: () => {
       toast.success('Expense updated');
-      qc.invalidateQueries({ queryKey: ['expenses-infinite'] });
+      qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['vendors'] });
       setEditOpen(false);
       setEditingExpense(null);
@@ -178,7 +178,7 @@ export default function ExpensesPage() {
     mutationFn: (id: number) => expensesApi.remove(id),
     onSuccess: () => {
       toast.success('Expense deleted');
-      qc.invalidateQueries({ queryKey: ['expenses-infinite'] });
+      qc.invalidateQueries({ queryKey: ['expenses'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });

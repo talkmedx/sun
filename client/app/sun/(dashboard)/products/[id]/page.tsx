@@ -81,7 +81,7 @@ export default function ProductDetailPage() {
     onSuccess: () => {
       toast.success('Product updated');
       qc.invalidateQueries({ queryKey: ['product', id] });
-      qc.invalidateQueries({ queryKey: ['products-infinite'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
       setEditOpen(false);
     },
     onError: (e) => toast.error(getErrorMessage(e)),

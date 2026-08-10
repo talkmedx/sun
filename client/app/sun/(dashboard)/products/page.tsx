@@ -104,7 +104,7 @@ export default function ProductsPage() {
       }),
     onSuccess: () => {
       toast.success('Product created');
-      qc.invalidateQueries({ queryKey: ['products-infinite'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['products-summary'] });
       setOpen(false);
       form.reset({
@@ -128,7 +128,7 @@ export default function ProductsPage() {
     },
     onSuccess: () => {
       toast.success('Product updated');
-      qc.invalidateQueries({ queryKey: ['products-infinite'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['products-summary'] });
       setEditOpen(false);
       setEditingProduct(null);
@@ -140,7 +140,7 @@ export default function ProductsPage() {
     mutationFn: (id: number) => productsApi.remove(id),
     onSuccess: () => {
       toast.success('Product deleted');
-      qc.invalidateQueries({ queryKey: ['products-infinite'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['products-summary'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),

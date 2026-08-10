@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Search, LayoutGrid, List, Loader2, Link2, MapPin, Eye, Plus, Upload, User, Phone, Mail, Layers } from 'lucide-react';
+import { Search, LayoutGrid, List, Loader2, Link2, MapPin, Eye, Plus, Upload, User, Phone, Mail, Layers, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { admissionsApi, batchesApi } from '@/services/api';
@@ -31,6 +31,12 @@ export default function AdmissionsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
+
+  // Reject modal state
+  const [rejectOpen, setRejectOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [rejectingAdmission, setRejectingAdmission] = useState<any | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const qc = useQueryClient();
 
@@ -89,7 +95,7 @@ export default function AdmissionsPage() {
     },
     onSuccess: () => {
       toast.success('Admission application added');
-      qc.invalidateQueries({ queryKey: ['admissions-infinite'] });
+      qc.invalidateQueries({ queryKey: ['admissions'] });
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
       setAddOpen(false);
       addForm.reset();
@@ -103,21 +109,22 @@ export default function AdmissionsPage() {
     mutationFn: (id: number) => admissionsApi.approve(id),
     onSuccess: () => {
       toast.success('Admission approved — student record created');
-      qc.invalidateQueries({ queryKey: ['admissions-infinite'] });
+      qc.invalidateQueries({ queryKey: ['admissions'] });
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
   const reject = useMutation({
-    mutationFn: (id: number) => {
-      const reason = prompt('Rejection reason:') || 'Not eligible';
-      return admissionsApi.reject(id, reason);
-    },
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => admissionsApi.reject(id, reason),
     onSuccess: () => {
-      toast.success('Admission rejected');
-      qc.invalidateQueries({ queryKey: ['admissions-infinite'] });
+      toast.success('Admission application rejected');
+      qc.invalidateQueries({ queryKey: ['admissions'] });
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
+      setRejectOpen(false);
+      setRejectingAdmission(null);
+      setRejectionReason('');
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -175,11 +182,29 @@ export default function AdmissionsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Phone *</Label>
-                  <Input {...addForm.register('phone', { required: true })} />
+                  <Input
+                    type="tel"
+                    maxLength={10}
+                    placeholder="10-digit mobile"
+                    {...addForm.register('phone', { required: true })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      addForm.setValue('phone', val, { shouldValidate: true });
+                    }}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Alternate Phone</Label>
-                  <Input {...addForm.register('alternate_phone')} />
+                  <Input
+                    type="tel"
+                    maxLength={10}
+                    placeholder="10-digit mobile"
+                    {...addForm.register('alternate_phone')}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      addForm.setValue('alternate_phone', val, { shouldValidate: true });
+                    }}
+                  />
                 </div>
               </div>
 
@@ -388,7 +413,16 @@ export default function AdmissionsPage() {
                           <Button size="sm" className="h-8 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approve.mutate(a.id)}>
                             Approve
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 text-xs px-2.5 text-destructive hover:bg-destructive/10" onClick={() => reject.mutate(a.id)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs px-2.5 text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              setRejectingAdmission(a);
+                              setRejectionReason('');
+                              setRejectOpen(true);
+                            }}
+                          >
                             Reject
                           </Button>
                         </div>
@@ -465,7 +499,16 @@ export default function AdmissionsPage() {
                                 <Button size="sm" className="h-8 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approve.mutate(a.id)}>
                                   Approve
                                 </Button>
-                                <Button size="sm" variant="outline" className="h-8 text-xs px-2.5 text-destructive hover:bg-destructive/10" onClick={() => reject.mutate(a.id)}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs px-2.5 text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setRejectingAdmission(a);
+                                    setRejectionReason('');
+                                    setRejectOpen(true);
+                                  }}
+                                >
                                   Reject
                                 </Button>
                               </>
@@ -495,6 +538,78 @@ export default function AdmissionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reject Admission Application Dialog Modal */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2 text-base font-semibold">
+              <AlertCircle className="h-5 w-5" />
+              Reject Admission Application
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Please specify a reason for rejecting {rejectingAdmission ? <strong className="text-foreground">{rejectingAdmission.first_name} {rejectingAdmission.last_name || ''}</strong> : 'this application'}.
+            </p>
+
+            {/* Quick suggestion pills */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Quick reasons</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Seat unavailable in batch',
+                  'Incomplete documentation',
+                  'Does not meet eligibility',
+                  'Cancelled by applicant',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRejectionReason(preset)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      rejectionReason === preset
+                        ? 'border-destructive bg-destructive/10 text-destructive font-medium'
+                        : 'border-border bg-muted/40 hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Rejection Reason *</Label>
+              <Textarea
+                placeholder="Enter detailed reason for rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+                className="text-xs sm:text-sm resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => setRejectOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={reject.isPending || !rejectionReason.trim()}
+              onClick={() => {
+                if (rejectingAdmission) {
+                  reject.mutate({ id: rejectingAdmission.id, reason: rejectionReason.trim() });
+                }
+              }}
+            >
+              {reject.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Confirm Rejection
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

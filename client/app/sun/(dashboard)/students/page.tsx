@@ -24,8 +24,11 @@ import { useDebounce } from '@/hooks/useDebounce';
 const schema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().optional(),
-  phone: z.string().min(10, 'Phone must be at least 10 digits'),
-  email: z.string().email().optional().or(z.literal('')),
+  phone: z
+    .string()
+    .min(1, 'Phone number is required')
+    .regex(/^[6-9]\d{9}$/, 'Invalid Indian phone number (10 digits starting with 6-9)'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
   batch_id: z.string().optional(),
   city: z.string().optional(),
   fees_committed: z.string().optional(),
@@ -102,7 +105,8 @@ export default function StudentsPage() {
       }),
     onSuccess: () => {
       toast.success('Student created');
-      qc.invalidateQueries({ queryKey: ['students-infinite'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['batch-summary-card'] });
       setOpen(false);
       form.reset({
         first_name: '',
@@ -124,7 +128,8 @@ export default function StudentsPage() {
     mutationFn: (id: number) => studentsApi.remove(id),
     onSuccess: () => {
       toast.success('Student deleted');
-      qc.invalidateQueries({ queryKey: ['students-infinite'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['batch-summary-card'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -144,12 +149,39 @@ export default function StudentsPage() {
             <DialogHeader><DialogTitle>New Student</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>First name *</Label><Input {...form.register('first_name')} /></div>
+                <div className="space-y-1">
+                  <Label>First name *</Label>
+                  <Input {...form.register('first_name')} />
+                  {form.formState.errors.first_name && (
+                    <p className="text-xs text-destructive mt-0.5">{form.formState.errors.first_name.message}</p>
+                  )}
+                </div>
                 <div className="space-y-1"><Label>Last name</Label><Input {...form.register('last_name')} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Phone *</Label><Input {...form.register('phone')} /></div>
-                <div className="space-y-1"><Label>Email</Label><Input {...form.register('email')} /></div>
+                <div className="space-y-1">
+                  <Label>Phone *</Label>
+                  <Input
+                    type="tel"
+                    maxLength={10}
+                    placeholder="10-digit mobile"
+                    {...form.register('phone')}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      form.setValue('phone', val, { shouldValidate: true });
+                    }}
+                  />
+                  {form.formState.errors.phone && (
+                    <p className="text-xs text-destructive mt-0.5">{form.formState.errors.phone.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Email</Label>
+                  <Input {...form.register('email')} />
+                  {form.formState.errors.email && (
+                    <p className="text-xs text-destructive mt-0.5">{form.formState.errors.email.message}</p>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Age</Label><Input type="number" placeholder="e.g. 24" {...form.register('age')} /></div>
