@@ -146,6 +146,7 @@ export const admissionSchema = z.object({
   pincode: z.string().max(20).optional().nullable(),
   batch_id: z.coerce.number().int().positive().optional().nullable(),
   preferred_batch_note: z.string().max(255).optional().nullable(),
+  admission_date: z.string().optional().nullable(),
 });
 
 export const rejectAdmissionSchema = z.object({
@@ -181,5 +182,6 @@ export const courseSchema = z.object({
   default_fee: z.coerce.number().min(0).optional().nullable(),
   description: z.string().optional().nullable(),
   is_active: z.coerce.number().int().optional(),
+  change_reason: z.string().max(255).optional().nullable(),
 });
 

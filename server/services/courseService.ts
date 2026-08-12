@@ -1,9 +1,54 @@
-import { RowDataPacket } from 'mysql2';
-import { query, queryOne, execute } from '../config/database';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { query, queryOne, execute, withTransaction } from '../config/database';
 import { NotFoundError, ConflictError } from '../utils/errors';
 import { likePattern } from '../helpers/queryHelpers';
 
 let ensureTablePromise: Promise<void> | null = null;
+
+async function ensureFeeHistoryTable() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS course_fee_history (
+      id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      course_id       BIGINT UNSIGNED NOT NULL,
+      default_fee     DECIMAL(12,2)   NOT NULL,
+      effective_from  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      effective_to    DATETIME        NULL COMMENT 'NULL = current fee',
+      changed_by      BIGINT UNSIGNED NULL,
+      change_reason   VARCHAR(255)    NULL,
+      created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      deleted_at      DATETIME        NULL,
+      PRIMARY KEY (id),
+      KEY idx_cfh_course (course_id),
+      KEY idx_cfh_effective (course_id, effective_from, effective_to),
+      CONSTRAINT fk_cfh_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
+  // Backfill history for existing courses missing a row
+  const courses = await query<RowDataPacket[]>(
+    `SELECT c.id, c.default_fee, c.created_at
+     FROM courses c
+     WHERE c.deleted_at IS NULL
+       AND c.default_fee IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM course_fee_history h
+         WHERE h.course_id = c.id AND h.deleted_at IS NULL
+       )`
+  );
+  for (const c of courses) {
+    await execute(
+      `INSERT INTO course_fee_history
+        (course_id, default_fee, effective_from, effective_to, change_reason)
+       VALUES (:course_id, :default_fee, :effective_from, NULL, 'Initial fee')`,
+      {
+        course_id: c.id,
+        default_fee: c.default_fee,
+        effective_from: c.created_at,
+      }
+    );
+  }
+}
 
 async function ensureTable() {
   if (!ensureTablePromise) {
@@ -45,6 +90,8 @@ async function ensureTable() {
             );
           }
         }
+
+        await ensureFeeHistoryTable();
       } catch (err) {
         ensureTablePromise = null;
         throw err;
@@ -85,24 +132,40 @@ export async function createCourse(data: {
   created_by?: number;
 }) {
   await ensureTable();
-  const existing = await queryOne<RowDataPacket>(`SELECT id FROM courses WHERE name = :name AND deleted_at IS NULL`, {
-    name: data.name,
-  });
-  if (existing) throw new ConflictError('Course with this name already exists');
 
-  const res = await execute(
-    `INSERT INTO courses (name, duration_days, default_fee, description, created_by)
-     VALUES (:name, :duration_days, :default_fee, :description, :created_by)`,
-    {
-      name: data.name,
-      duration_days: Number(data.duration_days) || 90,
-      default_fee: data.default_fee ? Number(data.default_fee) : null,
-      description: data.description || null,
-      created_by: data.created_by || null,
+  return withTransaction(async (conn) => {
+    const [existing] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM courses WHERE name = ? AND deleted_at IS NULL`,
+      [data.name]
+    );
+    if (existing[0]) throw new ConflictError('Course with this name already exists');
+
+    const [result] = await conn.execute<ResultSetHeader>(
+      `INSERT INTO courses (name, duration_days, default_fee, description, created_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        data.name,
+        Number(data.duration_days) || 90,
+        data.default_fee != null ? Number(data.default_fee) : null,
+        data.description || null,
+        data.created_by || null,
+      ]
+    );
+
+    const courseId = result.insertId;
+
+    if (data.default_fee != null) {
+      await conn.execute(
+        `INSERT INTO course_fee_history
+          (course_id, default_fee, effective_from, effective_to, changed_by, change_reason)
+         VALUES (?, ?, NOW(), NULL, ?, 'Initial fee')`,
+        [courseId, Number(data.default_fee), data.created_by || null]
+      );
     }
-  );
 
-  return getCourse(res.insertId);
+    const [rows] = await conn.execute<RowDataPacket[]>(`SELECT * FROM courses WHERE id = ?`, [courseId]);
+    return rows[0];
+  });
 }
 
 export async function updateCourse(
@@ -110,13 +173,15 @@ export async function updateCourse(
   data: {
     name?: string;
     duration_days?: number;
-    default_fee?: number;
+    default_fee?: number | null;
     description?: string;
     is_active?: number;
-  }
+    change_reason?: string;
+  },
+  userId?: number
 ) {
   await ensureTable();
-  await getCourse(id);
+  const course = await getCourse(id);
 
   if (data.name) {
     const existing = await queryOne<RowDataPacket>(
@@ -126,35 +191,77 @@ export async function updateCourse(
     if (existing) throw new ConflictError('Another course with this name already exists');
   }
 
-  const updates: string[] = [];
-  const params: Record<string, unknown> = { id };
+  return withTransaction(async (conn) => {
+    const feeChanged =
+      data.default_fee !== undefined &&
+      Number(data.default_fee ?? 0) !== Number(course.default_fee ?? 0);
 
-  if (data.name !== undefined) {
-    updates.push('name = :name');
-    params.name = data.name;
-  }
-  if (data.duration_days !== undefined) {
-    updates.push('duration_days = :duration_days');
-    params.duration_days = Number(data.duration_days);
-  }
-  if (data.default_fee !== undefined) {
-    updates.push('default_fee = :default_fee');
-    params.default_fee = data.default_fee ? Number(data.default_fee) : null;
-  }
-  if (data.description !== undefined) {
-    updates.push('description = :description');
-    params.description = data.description || null;
-  }
-  if (data.is_active !== undefined) {
-    updates.push('is_active = :is_active');
-    params.is_active = Number(data.is_active);
-  }
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
 
-  if (updates.length > 0) {
-    await execute(`UPDATE courses SET ${updates.join(', ')} WHERE id = :id`, params);
-  }
+    if (data.name !== undefined) {
+      updates.push('name = ?');
+      params.push(data.name);
+    }
+    if (data.duration_days !== undefined) {
+      updates.push('duration_days = ?');
+      params.push(Number(data.duration_days));
+    }
+    if (data.default_fee !== undefined) {
+      updates.push('default_fee = ?');
+      params.push(data.default_fee != null ? Number(data.default_fee) : null);
+    }
+    if (data.description !== undefined) {
+      updates.push('description = ?');
+      params.push(data.description || null);
+    }
+    if (data.is_active !== undefined) {
+      updates.push('is_active = ?');
+      params.push(Number(data.is_active));
+    }
 
-  return getCourse(id);
+    if (updates.length) {
+      params.push(id);
+      await conn.execute(`UPDATE courses SET ${updates.join(', ')} WHERE id = ?`, params);
+    }
+
+    if (feeChanged && data.default_fee != null) {
+      await conn.execute(
+        `UPDATE course_fee_history
+         SET effective_to = NOW()
+         WHERE course_id = ? AND effective_to IS NULL AND deleted_at IS NULL`,
+        [id]
+      );
+
+      await conn.execute(
+        `INSERT INTO course_fee_history
+          (course_id, default_fee, effective_from, effective_to, changed_by, change_reason)
+         VALUES (?, ?, NOW(), NULL, ?, ?)`,
+        [
+          id,
+          Number(data.default_fee),
+          userId || null,
+          data.change_reason || 'Fee update',
+        ]
+      );
+    }
+
+    const [rows] = await conn.execute<RowDataPacket[]>(`SELECT * FROM courses WHERE id = ?`, [id]);
+    return rows[0];
+  });
+}
+
+export async function getFeeHistory(courseId: number) {
+  await ensureTable();
+  await getCourse(courseId);
+  return query<RowDataPacket[]>(
+    `SELECT h.*, u.name AS changed_by_name
+     FROM course_fee_history h
+     LEFT JOIN users u ON u.id = h.changed_by
+     WHERE h.course_id = :courseId AND h.deleted_at IS NULL
+     ORDER BY h.effective_from DESC, h.id DESC`,
+    { courseId }
+  );
 }
 
 export async function deleteCourse(id: number) {

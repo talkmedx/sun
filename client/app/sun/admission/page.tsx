@@ -8,20 +8,23 @@ import { Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { admissionsApi, batchesApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Textarea } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api';
+import { AdmissionFormFields, type AdmissionFormValues } from '@/components/admissions/AdmissionFormFields';
+import {
+  admissionFormDefaults,
+  buildAdmissionFormData,
+  type AdmissionProofItem,
+} from '@/components/admissions/admission-form-utils';
 
 export default function PublicAdmissionPage() {
   const [done, setDone] = useState(false);
+  const [sameAsPermanent, setSameAsPermanent] = useState(false);
+  const [proofs, setProofs] = useState<AdmissionProofItem[]>([]);
   const [photo, setPhoto] = useState<File | null>(null);
-  const [proof, setProof] = useState<File | null>(null);
-  const form = useForm({
-    defaultValues: {
-      first_name: '', last_name: '', phone: '', email: '', city: '', state: '',
-      address_line1: '', pincode: '', batch_id: '', preferred_batch_note: '',
-    },
+
+  const form = useForm<AdmissionFormValues>({
+    defaultValues: admissionFormDefaults,
   });
 
   const { data: batches } = useQuery({
@@ -30,13 +33,8 @@ export default function PublicAdmissionPage() {
   });
 
   const submit = useMutation({
-    mutationFn: async (v: Record<string, string>) => {
-      const fd = new FormData();
-      Object.entries(v).forEach(([k, val]) => { if (val) fd.append(k, val); });
-      if (photo) fd.append('photo', photo);
-      if (proof) fd.append('proof', proof);
-      return admissionsApi.submit(fd);
-    },
+    mutationFn: async (v: AdmissionFormValues) =>
+      admissionsApi.submit(buildAdmissionFormData(v, proofs, photo)),
     onSuccess: () => {
       setDone(true);
       toast.success('Application submitted!');
@@ -78,52 +76,19 @@ export default function PublicAdmissionPage() {
             <CardDescription>Fill in your details. Mobile-friendly & secure.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={form.handleSubmit((v) => submit.mutate(v))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>First name *</Label><Input {...form.register('first_name', { required: true })} /></div>
-                <div className="space-y-1"><Label>Last name</Label><Input {...form.register('last_name')} /></div>
-              </div>
-              <div className="space-y-1">
-                <Label>Phone *</Label>
-                <Input
-                  type="tel"
-                  maxLength={10}
-                  placeholder="10-digit mobile number"
-                  {...form.register('phone', { required: true })}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                    form.setValue('phone', val, { shouldValidate: true });
-                  }}
-                />
-              </div>
-              <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register('email')} /></div>
-              <div className="space-y-1"><Label>Address</Label><Input {...form.register('address_line1')} /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>City</Label><Input {...form.register('city')} /></div>
-                <div className="space-y-1"><Label>State</Label><Input {...form.register('state')} /></div>
-              </div>
-              <div className="space-y-1"><Label>Pincode</Label><Input {...form.register('pincode')} /></div>
-              <div className="space-y-1">
-                <Label>Preferred batch</Label>
-                <Select onValueChange={(v) => form.setValue('batch_id', v)}>
-                  <SelectTrigger><SelectValue placeholder="Select batch" /></SelectTrigger>
-                  <SelectContent>
-                    {batches?.map((b) => (
-                      <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1"><Label>Notes</Label><Textarea {...form.register('preferred_batch_note')} /></div>
-              <div className="space-y-1">
-                <Label>Photo (selfie / camera)</Label>
-                <Input type="file" accept="image/*" capture="user" onChange={(e) => setPhoto(e.target.files?.[0] || null)} />
-              </div>
-              <div className="space-y-1">
-                <Label>ID / proof document</Label>
-                <Input type="file" accept="image/*,application/pdf" onChange={(e) => setProof(e.target.files?.[0] || null)} />
-              </div>
-              <Button type="submit" className="w-full" disabled={submit.isPending}>
+            <form onSubmit={form.handleSubmit((v) => submit.mutate(v))} className="space-y-3">
+              <AdmissionFormFields
+                form={form}
+                batches={batches}
+                sameAsPermanent={sameAsPermanent}
+                onSameAsPermanentChange={setSameAsPermanent}
+                proofs={proofs}
+                onProofsChange={setProofs}
+                photo={photo}
+                onPhotoChange={setPhoto}
+              />
+
+              <Button type="submit" className="w-full mt-2" disabled={submit.isPending}>
                 {submit.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Submit Application
               </Button>

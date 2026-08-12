@@ -26,3 +26,12 @@ export function formatDate(date: string | null | undefined) {
 export function formatNumber(n: number | string | null | undefined) {
   return new Intl.NumberFormat('en-IN').format(Number(n ?? 0));
 }
+
+export function formatFullName(first?: string | null, last?: string | null) {
+  return [first, last].filter(Boolean).join(' ').trim();
+}
+
+/** Store exact ID-proof name in first_name; last_name left empty. */
+export function fullNameToRecord(fullName: string) {
+  return { first_name: fullName.trim(), last_name: null as string | null };
+}

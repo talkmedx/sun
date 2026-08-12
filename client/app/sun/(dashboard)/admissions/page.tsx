@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Search, LayoutGrid, List, Loader2, Link2, MapPin, Eye, Plus, Upload, User, Phone, Mail, Layers, AlertCircle } from 'lucide-react';
+import { Search, LayoutGrid, List, Loader2, MapPin, Eye, Plus, Copy, Upload, User, Phone, Mail, Layers, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { admissionsApi, batchesApi } from '@/services/api';
@@ -13,7 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge, Skeleton } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatFullName } from '@/lib/utils';
+import { AdmissionFormFields, type AdmissionFormValues } from '@/components/admissions/AdmissionFormFields';
+import {
+  admissionFormDefaults,
+  buildAdmissionFormData,
+  type AdmissionProofItem,
+} from '@/components/admissions/admission-form-utils';
 import { getErrorMessage } from '@/lib/api';
 
 import { Pagination } from '@/components/ui/pagination';
@@ -29,8 +35,9 @@ export default function AdmissionsPage() {
 
   // Pop-up form states
   const [addOpen, setAddOpen] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [sameAsPermanent, setSameAsPermanent] = useState(false);
+  const [proofs, setProofs] = useState<AdmissionProofItem[]>([]);
+  const [photo, setPhoto] = useState<File | null>(null);
 
   // Reject modal state
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -44,28 +51,13 @@ export default function AdmissionsPage() {
     setPage(1);
   }, [debouncedSearch, status]);
 
-  const addForm = useForm({
-    defaultValues: {
-      first_name: '',
-      last_name: '',
-      phone: '',
-      alternate_phone: '',
-      email: '',
-      date_of_birth: '',
-      gender: 'female',
-      address_line1: '',
-      address_line2: '',
-      city: '',
-      state: '',
-      pincode: '',
-      batch_id: 'none',
-      preferred_batch_note: '',
-    },
+  const addForm = useForm<AdmissionFormValues>({
+    defaultValues: admissionFormDefaults,
   });
 
   const { data: batches } = useQuery({
-    queryKey: ['batches-dropdown'],
-    queryFn: async () => (await batchesApi.dropdown()).data.data,
+    queryKey: ['public-batches'],
+    queryFn: async () => (await batchesApi.public()).data.data,
   });
 
   const { data: admissionsResponse, isLoading } = useQuery({
@@ -84,23 +76,17 @@ export default function AdmissionsPage() {
   const totalCount = meta.total;
 
   const createAdmissionMutation = useMutation({
-    mutationFn: async (v: Record<string, string>) => {
-      const fd = new FormData();
-      Object.entries(v).forEach(([k, val]) => {
-        if (val && val !== 'none') fd.append(k, val);
-      });
-      if (photoFile) fd.append('photo', photoFile);
-      if (proofFile) fd.append('proof', proofFile);
-      return admissionsApi.submit(fd);
-    },
+    mutationFn: async (v: AdmissionFormValues) =>
+      admissionsApi.submit(buildAdmissionFormData(v, proofs, photo)),
     onSuccess: () => {
       toast.success('Admission application added');
       qc.invalidateQueries({ queryKey: ['admissions'] });
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
       setAddOpen(false);
-      addForm.reset();
-      setPhotoFile(null);
-      setProofFile(null);
+      addForm.reset(admissionFormDefaults);
+      setSameAsPermanent(false);
+      setProofs([]);
+      setPhoto(null);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -129,17 +115,6 @@ export default function AdmissionsPage() {
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const editLink = useMutation({
-    mutationFn: (id: number) => admissionsApi.editLink(id),
-    onSuccess: (res) => {
-      const url = `${window.location.origin}${res.data.data.editUrl}`;
-      navigator.clipboard.writeText(url);
-      toast.success('Edit link copied to clipboard & opening form');
-      window.open(url, '_blank');
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
   const statusVariant = (s: string) => {
     if (s === 'approved') return 'success' as const;
     if (s === 'rejected') return 'destructive' as const;
@@ -147,140 +122,59 @@ export default function AdmissionsPage() {
     return 'secondary' as const;
   };
 
+  const copyPublicFormLink = async () => {
+    const url = `${window.location.origin}/sun/admission`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Public admission form link copied!');
+    } catch {
+      toast.error('Could not copy link. Please copy manually: ' + url);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold">Admissions</h1>
           <p className="text-sm text-muted-foreground">
-            Public form:{' '}
-            <Link href="/sun/admission" className="text-primary hover:underline" target="_blank">
-              /admission
-            </Link>
+            Share the public admission form link with students
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={copyPublicFormLink}>
+            <Copy className="h-4 w-4 mr-1.5" /> Copy Public Form Link
+          </Button>
+
         {/* Add Admission Pop-up Button */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <Dialog
+          open={addOpen}
+          onOpenChange={(open) => {
+            setAddOpen(open);
+            if (!open) {
+              setSameAsPermanent(false);
+              setProofs([]);
+              setPhoto(null);
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-1.5" /> Add Admission</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader><DialogTitle>New Admission Application</DialogTitle></DialogHeader>
             <form onSubmit={addForm.handleSubmit((v) => createAdmissionMutation.mutate(v))} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>First Name *</Label>
-                  <Input {...addForm.register('first_name', { required: true })} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Last Name</Label>
-                  <Input {...addForm.register('last_name')} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Phone *</Label>
-                  <Input
-                    type="tel"
-                    maxLength={10}
-                    placeholder="10-digit mobile"
-                    {...addForm.register('phone', { required: true })}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      addForm.setValue('phone', val, { shouldValidate: true });
-                    }}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Alternate Phone</Label>
-                  <Input
-                    type="tel"
-                    maxLength={10}
-                    placeholder="10-digit mobile"
-                    {...addForm.register('alternate_phone')}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      addForm.setValue('alternate_phone', val, { shouldValidate: true });
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Email Address</Label>
-                <Input type="email" {...addForm.register('email')} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Date of Birth</Label>
-                  <Input type="date" {...addForm.register('date_of_birth')} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Gender</Label>
-                  <Select
-                    value={addForm.watch('gender')}
-                    onValueChange={(v) => addForm.setValue('gender', v)}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Batch</Label>
-                <Select
-                  value={addForm.watch('batch_id')}
-                  onValueChange={(v) => addForm.setValue('batch_id', v)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select batch" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {batches?.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1"><Label>City</Label><Input {...addForm.register('city')} /></div>
-                <div className="space-y-1"><Label>State</Label><Input {...addForm.register('state')} /></div>
-                <div className="space-y-1"><Label>Pincode</Label><Input {...addForm.register('pincode')} /></div>
-              </div>
-
-              <div className="space-y-1"><Label>Address Line 1</Label><Input {...addForm.register('address_line1')} /></div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Student Photo</Label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
-                  />
-                  {photoFile && <p className="text-[11px] text-emerald-600 font-medium">{photoFile.name}</p>}
-                </div>
-                <div className="space-y-1">
-                  <Label>ID / Payment Proof</Label>
-                  <Input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                  />
-                  {proofFile && <p className="text-[11px] text-emerald-600 font-medium">{proofFile.name}</p>}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Preference Note</Label>
-                <Textarea rows={2} placeholder="Any specific requirements..." {...addForm.register('preferred_batch_note')} />
-              </div>
+              <AdmissionFormFields
+                form={addForm}
+                batches={batches}
+                sameAsPermanent={sameAsPermanent}
+                onSameAsPermanentChange={setSameAsPermanent}
+                proofs={proofs}
+                onProofsChange={setProofs}
+                photo={photo}
+                onPhotoChange={setPhoto}
+              />
 
               <Button type="submit" className="w-full mt-2" disabled={createAdmissionMutation.isPending}>
                 {createAdmissionMutation.isPending ? 'Submitting...' : 'Add Admission Application'}
@@ -288,6 +182,7 @@ export default function AdmissionsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -396,18 +291,7 @@ export default function AdmissionsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-border/50">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs px-2.5"
-                        title="Copy & Open Edit Form Link"
-                        onClick={() => editLink.mutate(a.id)}
-                        disabled={editLink.isPending}
-                      >
-                        <Link2 className="h-3.5 w-3.5 mr-1" /> Edit Link
-                      </Button>
-
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-border/50">
                       {a.status !== 'approved' && a.status !== 'rejected' && (
                         <div className="flex items-center gap-1">
                           <Button size="sm" className="h-8 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approve.mutate(a.id)}>
@@ -477,17 +361,6 @@ export default function AdmissionsPage() {
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">{formatDate(a.created_at)}</td>
                         <td className="px-3 py-2.5 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs px-2.5"
-                              title="Copy & Open Student Edit Link"
-                              onClick={() => editLink.mutate(a.id)}
-                              disabled={editLink.isPending}
-                            >
-                              <Link2 className="h-3.5 w-3.5 mr-1" /> Edit Link
-                            </Button>
-
                             <Link href={`/sun/admissions/${a.id}`}>
                               <Button size="sm" variant="secondary" className="h-8 text-xs px-2">
                                 <Eye className="h-3.5 w-3.5 mr-1" /> Details

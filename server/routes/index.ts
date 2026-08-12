@@ -32,20 +32,28 @@ router.get('/health', (_req, res) => {
 // Public admission
 router.post(
   '/admissions',
-  uploadAdmission.fields([{ name: 'photo', maxCount: 1 }, { name: 'proof', maxCount: 1 }]),
+  uploadAdmission.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'proof', maxCount: 1 },
+    { name: 'proofs', maxCount: 10 },
+  ]),
   validate(admissionSchema),
   admissions.submit
 );
 router.get('/admissions/edit/:token', admissions.getByToken);
 router.put(
   '/admissions/edit/:token',
-  uploadAdmission.fields([{ name: 'photo', maxCount: 1 }, { name: 'proof', maxCount: 1 }]),
+  uploadAdmission.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'proof', maxCount: 1 },
+    { name: 'proofs', maxCount: 10 },
+  ]),
   validate(admissionSchema),
   admissions.updateByToken
 );
 
 // Public batches for admission form
-router.get('/batches/public', batches.dropdown);
+router.get('/batches/public', batches.publicDropdown);
 
 // ── Protected routes ───────────────────────────────────────
 router.use(authenticate);
@@ -85,6 +93,7 @@ router.delete('/students/:id/documents/:docId', adminOnly, students.deleteDocume
 
 // Courses — full CRUD admin only; dropdown allowed for staff
 router.get('/courses', staffOk, courses.list);
+router.get('/courses/:id/fee-history', staffOk, courses.feeHistory);
 router.get('/courses/:id', staffOk, courses.get);
 router.post('/courses', adminOnly, validate(courseSchema), courses.create);
 router.put('/courses/:id', adminOnly, validate(courseSchema.partial()), courses.update);

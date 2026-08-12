@@ -297,7 +297,7 @@ export async function listStudentProducts(studentId: number) {
      JOIN products p ON p.id = sp.product_id
      LEFT JOIN vendors v ON v.id = p.vendor_id
      WHERE sp.student_id = :studentId AND sp.deleted_at IS NULL
-     ORDER BY sp.purchase_date DESC`,
+     ORDER BY sp.updated_at DESC, sp.id DESC`,
     { studentId }
   );
 }

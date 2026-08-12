@@ -132,9 +132,24 @@ export async function deleteBatch(id: number) {
   await execute(`UPDATE batches SET deleted_at = NOW() WHERE id = :id`, { id });
 }
 
-export async function listBatchesDropdown() {
+export async function listBatchesForAdmission() {
   return query<RowDataPacket[]>(
     `SELECT id, name, status, course_fee, offer_fee FROM batches
-     WHERE deleted_at IS NULL ORDER BY name`
+     WHERE deleted_at IS NULL AND status IN ('ongoing', 'upcoming')
+     ORDER BY name`
+  );
+}
+
+export async function listBatchesDropdown(status?: string) {
+  const conditions = ['deleted_at IS NULL'];
+  const params: Record<string, unknown> = {};
+  if (status) {
+    conditions.push('status = :status');
+    params.status = status;
+  }
+  return query<RowDataPacket[]>(
+    `SELECT id, name, status, course_fee, offer_fee FROM batches
+     WHERE ${conditions.join(' AND ')} ORDER BY name`,
+    params
   );
 }

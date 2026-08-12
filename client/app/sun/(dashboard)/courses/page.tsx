@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Pencil, LayoutGrid, List, Search, BookOpen, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -280,7 +281,11 @@ export default function CoursesPage() {
                     <div key={c.id} className="rounded-xl border border-border/80 p-4 space-y-3 bg-card shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between">
-                          <h3 className="font-semibold text-base">{c.name}</h3>
+                          <h3 className="font-semibold text-base">
+                            <Link href={`/sun/courses/${c.id}`} className="hover:text-primary transition-colors">
+                              {c.name}
+                            </Link>
+                          </h3>
                           <Badge variant={c.is_active ? 'success' : 'secondary'}>
                             {c.is_active ? 'Active' : 'Inactive'}
                           </Badge>
@@ -352,7 +357,9 @@ export default function CoursesPage() {
                       {paginatedCourses.map((c) => (
                         <tr key={c.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                           <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                            <div>{c.name}</div>
+                            <Link href={`/sun/courses/${c.id}`} className="hover:text-primary transition-colors">
+                              <div>{c.name}</div>
+                            </Link>
                             {c.description && <div className="text-xs text-muted-foreground max-w-xs truncate">{c.description}</div>}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap font-medium">

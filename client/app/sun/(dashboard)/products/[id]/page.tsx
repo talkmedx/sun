@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Pencil } from 'lucide-react';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { productsApi, vendorsApi } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -113,16 +114,47 @@ export default function ProductDetailPage() {
   });
 
   if (isLoading) return <Skeleton className="h-48 w-full" />;
-  if (!product) return <p>Not found</p>;
+  if (!product) return (
+    <div className="p-8 text-center space-y-4">
+      <p className="text-lg font-medium text-muted-foreground">Product not found</p>
+      <Button asChild variant="outline"><Link href="/sun/products">Back to Products</Link></Button>
+    </div>
+  );
+
+  const profitPerUnit = Number(product.selling_price) - Number(product.cost_price);
+  const profitPercent = Number(product.cost_price) > 0
+    ? ((profitPerUnit * 100) / Number(product.cost_price)).toFixed(1)
+    : '0';
+  const stockValue = Number(product.selling_price) * Number(product.quantity_available);
+  const stockProfit = profitPerUnit * Number(product.quantity_available);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-semibold">{product.name}</h1>
-          <p className="text-sm text-muted-foreground">{product.sku || 'No SKU'} · {product.vendor_name || 'No vendor'}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-card border border-border/60 shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="outline" size="icon" asChild className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground">
+            <Link href="/sun/products"><ArrowLeft className="h-4 w-4" /></Link>
+          </Button>
+          <div className="min-w-0">
+            <h1 className="font-display text-xl sm:text-2xl font-bold tracking-tight truncate">{product.name}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {product.sku ? `SKU: ${product.sku}` : 'No SKU'}
+              {product.vendor_name && (
+                <>
+                  {' · '}
+                  {product.vendor_id ? (
+                    <Link href={`/sun/vendors/${product.vendor_id}`} className="hover:text-primary transition-colors">
+                      {product.vendor_name}
+                    </Link>
+                  ) : (
+                    product.vendor_name
+                  )}
+                </>
+              )}
+            </p>
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleEditClick}>
+        <Button variant="outline" size="sm" onClick={handleEditClick} className="shrink-0">
           <Pencil className="h-4 w-4 mr-1.5" /> Edit Product
         </Button>
       </div>
@@ -172,12 +204,26 @@ export default function ProductDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cost</p><p className="text-xl font-semibold">{formatCurrency(product.cost_price)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Selling</p><p className="text-xl font-semibold">{formatCurrency(product.selling_price)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Available</p><p className="text-xl font-semibold">{product.quantity_available}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Sold</p><p className="text-xl font-semibold">{product.quantity_sold}</p></CardContent></Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cost Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.cost_price)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Selling Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.selling_price)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Available Units</p><p className="text-xl font-semibold">{product.quantity_available}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Units Sold</p><p className="text-xl font-semibold">{product.quantity_sold}</p></CardContent></Card>
       </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit / unit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(profitPerUnit)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit %</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{profitPercent}%</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Value</p><p className="text-xl font-semibold">{formatCurrency(stockValue)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Profit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stockProfit)}</p></CardContent></Card>
+      </div>
+
+      {product.description && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Description</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{product.description}</p></CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

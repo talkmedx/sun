@@ -65,6 +65,7 @@ export const batchesApi = {
 export const coursesApi = {
   list: (params?: { search?: string }) => api.get<ApiResponse<Course[]>>('/courses', { params }),
   get: (id: number) => api.get<ApiResponse<Course>>(`/courses/${id}`),
+  feeHistory: (id: number) => api.get(`/courses/${id}/fee-history`),
   create: (data: Record<string, unknown>) => api.post<ApiResponse<Course>>('/courses', data),
   update: (id: number, data: Record<string, unknown>) => api.put<ApiResponse<Course>>(`/courses/${id}`, data),
   remove: (id: number) => api.delete<ApiResponse<null>>(`/courses/${id}`),

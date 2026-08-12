@@ -79,6 +79,8 @@ export default function DashboardPage() {
     currency?: boolean;
   }[] = isParticularBatch
     ? [
+        { key: 'total_fees_collected', label: 'Fees Collected', icon: IndianRupee, href: `/students?batch_id=${batchId}`, currency: true },
+        { key: 'pending_fees', label: 'Pending Fees', icon: AlertCircle, href: `/students?batch_id=${batchId}`, currency: true },
         { key: 'batch_revenue', label: 'Batch Revenue', icon: IndianRupee, href: `/batches?id=${batchId}`, currency: true },
         { key: 'offer_expense', label: 'Offer Expense', icon: Tag, href: `/batches?id=${batchId}`, currency: true },
         { key: 'fees_profit', label: 'Fees Profit', icon: TrendingUp, href: `/batches?id=${batchId}`, currency: true },
@@ -86,13 +88,11 @@ export default function DashboardPage() {
         { key: 'expenses', label: 'Expenses', icon: Wallet, href: `/expenses?batch_id=${batchId}`, currency: true },
         { key: 'batch_profit', label: 'Total Batch Profit', icon: TrendingUp, href: `/batches?id=${batchId}`, currency: true },
         { key: 'total_students', label: 'Students in Batch', icon: Users, href: `/students?batch_id=${batchId}` },
-        { key: 'total_fees_collected', label: 'Fees Collected', icon: IndianRupee, href: `/students?batch_id=${batchId}`, currency: true },
-        { key: 'pending_fees', label: 'Pending Fees', icon: AlertCircle, href: `/students?batch_id=${batchId}`, currency: true },
       ]
     : [
         { key: 'total_fees_collected', label: 'Fees Collected', icon: IndianRupee, href: '/reports?tab=fees', currency: true },
-        { key: 'total_fees_committed', label: 'Fees Committed', icon: TrendingUp, href: '/reports?tab=fees', currency: true },
         { key: 'pending_fees', label: 'Pending Fees', icon: AlertCircle, href: '/students?filter=pending', currency: true },
+        { key: 'total_fees_committed', label: 'Course Fees Committed', icon: TrendingUp, href: '/reports?tab=fees', currency: true },
         { key: 'current_fy_expenses', label: 'F.Y. Expenses', icon: Wallet, href: '/expenses', currency: true },
         { key: 'financial_year_profit', label: 'F.Y. Profit', icon: TrendingUp, href: '/reports?tab=profit', currency: true },
         { key: 'vendors', label: 'Vendors', icon: Store, href: '/vendors' },

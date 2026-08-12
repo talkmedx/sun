@@ -18,7 +18,7 @@ import { Input, Label, Textarea } from '@/components/ui/input';
 import { Badge, Skeleton } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullName, fullNameToRecord } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 
 const DOC_TYPES = ['Aadhar Card', 'Pan Card', 'Driving License', 'Voting Card', 'Rent Agreement', 'Other'];
@@ -122,8 +122,7 @@ export default function StudentProfilePage() {
 
   const editStudentForm = useForm({
     defaultValues: {
-      first_name: '',
-      last_name: '',
+      full_name: '',
       phone: '',
       email: '',
       age: '',
@@ -189,9 +188,11 @@ export default function StudentProfilePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateStudentMutation = useMutation({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mutationFn: async (values: any) =>
-      studentsApi.update(id, {
-        ...values,
+    mutationFn: async (values: any) => {
+      const { full_name, ...rest } = values;
+      return studentsApi.update(id, {
+        ...rest,
+        ...fullNameToRecord(full_name || ''),
         batch_id: values.batch_id && values.batch_id !== 'none' ? Number(values.batch_id) : null,
         fees_committed: values.fees_committed ? Number(values.fees_committed) : undefined,
         age: values.age ? Number(values.age) : null,
@@ -199,7 +200,8 @@ export default function StudentProfilePage() {
         admission_date: values.admission_date || null,
         address_line1: values.address_line1 || null,
         address_line2: values.address_line2 || null,
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success('Student details updated');
       qc.invalidateQueries({ queryKey: ['student', id] });
@@ -392,8 +394,7 @@ export default function StudentProfilePage() {
   const handleEditStudentClick = () => {
     if (!student) return;
     editStudentForm.reset({
-      first_name: student.first_name || '',
-      last_name: student.last_name || '',
+      full_name: formatFullName(student.first_name, student.last_name),
       phone: student.phone || '',
       email: student.email || '',
       age: student.age != null ? String(student.age) : '',
@@ -500,9 +501,9 @@ export default function StudentProfilePage() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader><DialogTitle>Edit Student Details</DialogTitle></DialogHeader>
           <form onSubmit={editStudentForm.handleSubmit((v) => updateStudentMutation.mutate(v))} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>First name *</Label><Input {...editStudentForm.register('first_name')} /></div>
-              <div className="space-y-1"><Label>Last name</Label><Input {...editStudentForm.register('last_name')} /></div>
+            <div className="space-y-1">
+              <Label>Full Name (as per ID proof) *</Label>
+              <Input {...editStudentForm.register('full_name')} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -581,7 +582,7 @@ export default function StudentProfilePage() {
                   <SelectItem value="none">None</SelectItem>
                   {batches?.map((b) => (
                     <SelectItem key={b.id} value={String(b.id)}>
-                      {b.name} ({formatCurrency(b.offer_fee ?? b.course_fee)})
+                      {b.name} ({formatCurrency(b.course_fee)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1457,6 +1458,9 @@ export default function StudentProfilePage() {
                             <span className="font-bold text-sm text-foreground">{p.product_name}</span>
                             <Badge variant="secondary" className="font-semibold">{p.quantity} units</Badge>
                           </div>
+                          <div className="text-[11px] text-muted-foreground font-medium -mt-1">
+                            Date: {p.purchase_date ? formatDate(p.purchase_date) : '—'}
+                          </div>
                           <div style={{ color: '#666666' }} className="text-[11px] font-medium -mt-1">
                             Vendor: {p.vendor_name || '—'}
                           </div>
@@ -1509,6 +1513,7 @@ export default function StudentProfilePage() {
                       <thead>
                         <tr className="border-b bg-muted/40 text-left text-muted-foreground text-xs uppercase tracking-wider">
                           <th className="px-4 py-3 font-semibold">Product Name</th>
+                          <th className="px-4 py-3 font-semibold">Date</th>
                           <th className="px-4 py-3 font-semibold">Vendor Name</th>
                           <th className="px-4 py-3 font-semibold">Cost Price/unit</th>
                           <th className="px-4 py-3 font-semibold">Selling Price/unit</th>
@@ -1532,6 +1537,7 @@ export default function StudentProfilePage() {
                           return (
                             <tr key={p.id} className="border-b border-border/40 hover:bg-muted/20 text-xs transition-colors">
                               <td className="px-4 py-3.5 font-bold text-foreground">{p.product_name}</td>
+                              <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">{p.purchase_date ? formatDate(p.purchase_date) : '—'}</td>
                               <td className="px-4 py-3.5 text-muted-foreground">{p.vendor_name || '—'}</td>
                               <td className="px-4 py-3.5">{formatCurrency(costUnit)}</td>
                               <td className="px-4 py-3.5">{formatCurrency(sellUnit)}</td>
@@ -1561,7 +1567,7 @@ export default function StudentProfilePage() {
                           );
                         })}
                         {!purchases?.length && (
-                          <tr><td colSpan={9} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
+                          <tr><td colSpan={10} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
                         )}
                       </tbody>
                     </table>

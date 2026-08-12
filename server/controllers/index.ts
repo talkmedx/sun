@@ -193,9 +193,15 @@ export const batches = {
       );
     } catch (e) { next(e); }
   },
-  dropdown: async (_req: Request, res: Response, next: NextFunction) => {
+  dropdown: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      return success(res, await batchService.listBatchesDropdown());
+      const status = req.query.status as string | undefined;
+      return success(res, await batchService.listBatchesDropdown(status));
+    } catch (e) { next(e); }
+  },
+  publicDropdown: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await batchService.listBatchesForAdmission());
     } catch (e) { next(e); }
   },
   get: async (req: Request, res: Response, next: NextFunction) => {
@@ -240,7 +246,16 @@ export const courses = {
   },
   update: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      return success(res, await courseService.updateCourse(Number(req.params.id), req.body), 'Updated');
+      return success(
+        res,
+        await courseService.updateCourse(Number(req.params.id), req.body, req.user!.userId),
+        'Updated'
+      );
+    } catch (e) { next(e); }
+  },
+  feeHistory: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      return success(res, await courseService.getFeeHistory(Number(req.params.id)));
     } catch (e) { next(e); }
   },
   remove: async (req: Request, res: Response, next: NextFunction) => {
@@ -440,8 +455,21 @@ export const admissions = {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
       const photo = files?.photo?.[0] ? publicUploadPath('admissions', files.photo[0].filename) : undefined;
-      const proof = files?.proof?.[0] ? publicUploadPath('admissions', files.proof[0].filename) : undefined;
-      return created(res, await admissionService.submitAdmission(req.body, photo, proof), 'Application submitted');
+      const legacyProof = files?.proof?.[0] ? publicUploadPath('admissions', files.proof[0].filename) : undefined;
+      const proofFiles = files?.proofs || [];
+      const titles = req.body.proof_titles;
+      const titleArr = Array.isArray(titles) ? titles : titles ? [titles] : [];
+      const proofDocuments = proofFiles.map((f, i) => ({
+        title: titleArr[i] || 'Proof',
+        url: publicUploadPath('admissions', f.filename),
+        fileType: f.mimetype,
+        fileSize: f.size,
+      }));
+      return created(
+        res,
+        await admissionService.submitAdmission(req.body, photo, legacyProof, proofDocuments),
+        'Application submitted'
+      );
     } catch (e) { next(e); }
   },
   approve: async (req: Request, res: Response, next: NextFunction) => {
@@ -468,8 +496,21 @@ export const admissions = {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
       const photo = files?.photo?.[0] ? publicUploadPath('admissions', files.photo[0].filename) : undefined;
-      const proof = files?.proof?.[0] ? publicUploadPath('admissions', files.proof[0].filename) : undefined;
-      return success(res, await admissionService.updateByEditToken(String(req.params.token), req.body, photo, proof), 'Updated');
+      const legacyProof = files?.proof?.[0] ? publicUploadPath('admissions', files.proof[0].filename) : undefined;
+      const proofFiles = files?.proofs || [];
+      const titles = req.body.proof_titles;
+      const titleArr = Array.isArray(titles) ? titles : titles ? [titles] : [];
+      const proofDocuments = proofFiles.map((f, i) => ({
+        title: titleArr[i] || 'Proof',
+        url: publicUploadPath('admissions', f.filename),
+        fileType: f.mimetype,
+        fileSize: f.size,
+      }));
+      return success(
+        res,
+        await admissionService.updateByEditToken(String(req.params.token), req.body, photo, legacyProof, proofDocuments),
+        'Updated'
+      );
     } catch (e) { next(e); }
   },
 };

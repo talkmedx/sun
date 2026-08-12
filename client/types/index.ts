@@ -134,6 +134,7 @@ export interface Admission {
   batch_course_fee?: number | null;
   batch_offer_fee?: number | null;
   preferred_batch_note?: string | null;
+  admission_date?: string | null;
   fees_committed?: number;
   fees_collected?: number;
   student_id?: number | null;

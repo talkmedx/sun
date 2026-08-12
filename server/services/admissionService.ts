@@ -5,6 +5,45 @@ import { paginate, likePattern } from '../helpers/queryHelpers';
 import { generateToken, normalizePhone, generateStudentCode } from '../helpers/generators';
 import * as notificationService from './notificationService';
 
+interface AdmissionProofDoc {
+  title: string;
+  url: string;
+  fileType?: string;
+  fileSize?: number;
+}
+
+let admissionColumnsEnsured = false;
+async function ensureAdmissionColumns() {
+  if (admissionColumnsEnsured) return;
+  try {
+    await execute('ALTER TABLE admissions ADD COLUMN admission_date DATE NULL');
+  } catch {
+    // Column already exists
+  }
+  admissionColumnsEnsured = true;
+}
+
+async function saveAdmissionDocuments(
+  admissionId: number,
+  docs: AdmissionProofDoc[],
+  uploadedBy?: number | null
+) {
+  for (const doc of docs) {
+    await execute(
+      `INSERT INTO documents (entity_type, entity_id, title, file_url, file_type, file_size, uploaded_by)
+       VALUES ('admission', :admissionId, :title, :url, :fileType, :fileSize, :uploadedBy)`,
+      {
+        admissionId,
+        title: doc.title,
+        url: doc.url,
+        fileType: doc.fileType || null,
+        fileSize: doc.fileSize || null,
+        uploadedBy: uploadedBy ?? null,
+      }
+    );
+  }
+}
+
 interface ListParams {
   page?: number;
   limit?: number;
@@ -71,19 +110,21 @@ export async function getAdmission(id: number) {
 export async function submitAdmission(
   data: Record<string, unknown>,
   photoUrl?: string,
-  proofUrl?: string
+  proofUrl?: string,
+  proofDocuments: AdmissionProofDoc[] = []
 ) {
+  await ensureAdmissionColumns();
   const phone = normalizePhone(String(data.phone));
 
   const result = await execute(
     `INSERT INTO admissions
       (first_name, last_name, email, phone, date_of_birth, gender,
        address_line1, address_line2, city, state, pincode,
-       photo_url, proof_url, batch_id, preferred_batch_note, status)
+       photo_url, proof_url, batch_id, preferred_batch_note, admission_date, status)
      VALUES
       (:first_name, :last_name, :email, :phone, :date_of_birth, :gender,
        :address_line1, :address_line2, :city, :state, :pincode,
-       :photoUrl, :proofUrl, :batch_id, :preferred_batch_note, 'pending')`,
+       :photoUrl, :proofUrl, :batch_id, :preferred_batch_note, :admission_date, 'pending')`,
     {
       first_name: data.first_name,
       last_name: data.last_name || null,
@@ -97,11 +138,16 @@ export async function submitAdmission(
       state: data.state || null,
       pincode: data.pincode || null,
       photoUrl: photoUrl || null,
-      proofUrl: proofUrl || null,
+      proofUrl: proofUrl || proofDocuments[0]?.url || null,
       batch_id: data.batch_id || null,
       preferred_batch_note: data.preferred_batch_note || null,
+      admission_date: data.admission_date || null,
     }
   );
+
+  if (proofDocuments.length) {
+    await saveAdmissionDocuments(result.insertId, proofDocuments);
+  }
 
   await notificationService.create({
     title: 'New Admission Application',
@@ -122,6 +168,12 @@ export async function approveAdmission(id: number, userId: number) {
     const admission = admissions[0];
     if (!admission) throw new NotFoundError('Admission');
     if (admission.status === 'approved') throw new AppError('Already approved', 400);
+
+    try {
+      await conn.execute('ALTER TABLE students ADD COLUMN admission_date DATE NULL');
+    } catch {
+      // Column already exists
+    }
 
     // Determine fees from batch
     let feesCommitted = 0;
@@ -144,8 +196,8 @@ export async function approveAdmission(id: number, userId: number) {
       `INSERT INTO students
         (student_code, first_name, last_name, email, phone, date_of_birth, gender,
          address_line1, address_line2, city, state, pincode, photo_url,
-         batch_id, admission_id, fees_committed, status, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+         batch_id, admission_id, fees_committed, admission_date, status, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
       [
         code,
         admission.first_name,
@@ -163,6 +215,7 @@ export async function approveAdmission(id: number, userId: number) {
         admission.batch_id,
         id,
         feesCommitted,
+        admission.admission_date || null,
         userId,
       ]
     );
@@ -174,8 +227,21 @@ export async function approveAdmission(id: number, userId: number) {
       [studentResult.insertId, userId, id]
     );
 
-    // Copy proof as document if present
-    if (admission.proof_url) {
+    // Copy uploaded proofs as student documents
+    const [admissionDocs] = await conn.execute<RowDataPacket[]>(
+      `SELECT title, file_url FROM documents
+       WHERE entity_type = 'admission' AND entity_id = ? AND deleted_at IS NULL`,
+      [id]
+    );
+    if (admissionDocs.length) {
+      for (const doc of admissionDocs) {
+        await conn.execute(
+          `INSERT INTO documents (entity_type, entity_id, title, file_url, uploaded_by)
+           VALUES ('student', ?, ?, ?, ?)`,
+          [studentResult.insertId, doc.title, doc.file_url, userId]
+        );
+      }
+    } else if (admission.proof_url) {
       await conn.execute(
         `INSERT INTO documents (entity_type, entity_id, title, file_url, uploaded_by)
          VALUES ('student', ?, 'Admission Proof', ?, ?)`,
@@ -244,14 +310,16 @@ export async function updateByEditToken(
   token: string,
   data: Record<string, unknown>,
   photoUrl?: string,
-  proofUrl?: string
+  proofUrl?: string,
+  proofDocuments: AdmissionProofDoc[] = []
 ) {
+  await ensureAdmissionColumns();
   const admission = await getByEditToken(token);
 
   const fields = [
     'first_name', 'last_name', 'email', 'phone', 'date_of_birth', 'gender',
     'address_line1', 'address_line2', 'city', 'state', 'pincode',
-    'batch_id', 'preferred_batch_note',
+    'batch_id', 'preferred_batch_note', 'admission_date',
   ];
   const sets: string[] = ["status = 'pending'", 'edit_token = NULL', 'edit_token_expires = NULL'];
   const params: Record<string, unknown> = { id: admission.id };
@@ -272,6 +340,15 @@ export async function updateByEditToken(
   }
 
   await execute(`UPDATE admissions SET ${sets.join(', ')} WHERE id = :id`, params);
+
+  if (proofDocuments.length) {
+    await execute(
+      `UPDATE documents SET deleted_at = NOW()
+       WHERE entity_type = 'admission' AND entity_id = :id AND deleted_at IS NULL`,
+      { id: admission.id }
+    );
+    await saveAdmissionDocuments(admission.id, proofDocuments);
+  }
 
   await notificationService.create({
     title: 'Admission Updated',

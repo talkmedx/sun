@@ -91,12 +91,11 @@ export default function BatchesPage() {
     setSelectedCourse(courseName);
     const courseObj = availableCourses.find((c) => c.name === courseName);
     if (courseObj) {
-      if (!form.getValues('course_fee') && courseObj.default_fee) {
-        form.setValue('course_fee', String(courseObj.default_fee));
-      }
-      if (!form.getValues('name')) {
-        form.setValue('name', `${courseName} Batch`);
-      }
+      form.setValue(
+        'course_fee',
+        courseObj.default_fee != null ? String(courseObj.default_fee) : ''
+      );
+      form.setValue('name', `${courseName} Batch`);
       const startDate = form.getValues('start_date');
       if (startDate) {
         const endDate = calcEndDate(startDate, courseName);

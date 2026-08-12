@@ -15,15 +15,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge, Skeleton } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatFullName, fullNameToRecord } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
 
 import { Pagination } from '@/components/ui/pagination';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const schema = z.object({
-  first_name: z.string().min(1, 'First name is required'),
-  last_name: z.string().optional(),
+  full_name: z.string().min(1, 'Full name is required'),
   phone: z
     .string()
     .min(1, 'Phone number is required')
@@ -80,8 +79,7 @@ export default function StudentsPage() {
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
-      first_name: '',
-      last_name: '',
+      full_name: '',
       phone: '',
       email: '',
       batch_id: 'none',
@@ -94,23 +92,25 @@ export default function StudentsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof schema>) =>
-      studentsApi.create({
-        ...values,
+    mutationFn: async (values: z.infer<typeof schema>) => {
+      const { full_name, ...rest } = values;
+      return studentsApi.create({
+        ...rest,
+        ...fullNameToRecord(full_name),
         batch_id: values.batch_id && values.batch_id !== 'none' ? Number(values.batch_id) : null,
         fees_committed: values.fees_committed ? Number(values.fees_committed) : undefined,
         age: values.age ? Number(values.age) : undefined,
         designation: values.designation || undefined,
         admission_date: values.admission_date || undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success('Student created');
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['batch-summary-card'] });
       setOpen(false);
       form.reset({
-        first_name: '',
-        last_name: '',
+        full_name: '',
         phone: '',
         email: '',
         batch_id: 'none',
@@ -148,15 +148,12 @@ export default function StudentsPage() {
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
             <DialogHeader><DialogTitle>New Student</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>First name *</Label>
-                  <Input {...form.register('first_name')} />
-                  {form.formState.errors.first_name && (
-                    <p className="text-xs text-destructive mt-0.5">{form.formState.errors.first_name.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1"><Label>Last name</Label><Input {...form.register('last_name')} /></div>
+              <div className="space-y-1">
+                <Label>Full Name (as per ID proof) *</Label>
+                <Input {...form.register('full_name')} />
+                {form.formState.errors.full_name && (
+                  <p className="text-xs text-destructive mt-0.5">{form.formState.errors.full_name.message}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -215,7 +212,7 @@ export default function StudentsPage() {
                     <SelectItem value="none">None</SelectItem>
                     {batches?.map((b) => (
                       <SelectItem key={b.id} value={String(b.id)}>
-                        {b.name} ({formatCurrency(b.offer_fee ?? b.course_fee)})
+                        {b.name} ({formatCurrency(b.course_fee)})
                       </SelectItem>
                     ))}
                   </SelectContent>

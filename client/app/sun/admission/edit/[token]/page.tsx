@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api';
+import { formatFullName, fullNameToRecord } from '@/lib/utils';
 
 export default function EditAdmissionPage() {
   const token = String(useParams().token);
@@ -32,8 +33,7 @@ export default function EditAdmissionPage() {
   useEffect(() => {
     if (data) {
       form.reset({
-        first_name: data.first_name,
-        last_name: data.last_name || '',
+        full_name: formatFullName(data.first_name, data.last_name),
         phone: data.phone,
         email: data.email || '',
         city: data.city || '',
@@ -46,7 +46,13 @@ export default function EditAdmissionPage() {
   const update = useMutation({
     mutationFn: async (v: Record<string, string>) => {
       const fd = new FormData();
-      Object.entries(v).forEach(([k, val]) => { if (val) fd.append(k, val); });
+      const { first_name, last_name } = fullNameToRecord(v.full_name || '');
+      fd.append('first_name', first_name);
+      if (last_name) fd.append('last_name', last_name);
+      Object.entries(v).forEach(([k, val]) => {
+        if (k === 'full_name' || !val) return;
+        fd.append(k, val);
+      });
       return admissionsApi.updateByToken(token, fd);
     },
     onSuccess: () => {
@@ -73,9 +79,9 @@ export default function EditAdmissionPage() {
         <CardHeader><CardTitle>Edit Application</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit((v) => update.mutate(v as Record<string, string>))} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>First name</Label><Input {...form.register('first_name', { required: true })} /></div>
-              <div className="space-y-1"><Label>Last name</Label><Input {...form.register('last_name')} /></div>
+            <div className="space-y-1">
+              <Label>Full Name (as per ID proof) *</Label>
+              <Input {...form.register('full_name', { required: true })} />
             </div>
             <div className="space-y-1"><Label>Phone</Label><Input {...form.register('phone', { required: true })} /></div>
             <div className="space-y-1"><Label>Email</Label><Input {...form.register('email')} /></div>

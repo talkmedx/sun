@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Plus, Search, Trash2, Pencil, LayoutGrid, List, Loader2, Package, TrendingUp, DollarSign, ShoppingBag } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -431,7 +432,11 @@ export default function ProductsPage() {
                       <div>
                         <div className="flex items-start justify-between">
                           <div>
-                            <h3 className="font-semibold text-base">{p.name}</h3>
+                            <h3 className="font-semibold text-base">
+                              <Link href={`/sun/products/${p.id}`} className="hover:text-primary transition-colors">
+                                {p.name}
+                              </Link>
+                            </h3>
                             {p.vendor_name && <p className="text-xs text-muted-foreground font-medium">Vendor: {p.vendor_name}</p>}
                           </div>
                           <Badge variant={m.qtyAvailable > 0 ? 'success' : 'destructive'}>
@@ -510,7 +515,9 @@ export default function ProductsPage() {
                       return (
                         <tr key={p.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                           <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                            <div>{p.name}</div>
+                            <Link href={`/sun/products/${p.id}`} className="hover:text-primary transition-colors">
+                              <div>{p.name}</div>
+                            </Link>
                             {p.sku && <div className="text-[11px] text-muted-foreground font-mono">SKU: {p.sku}</div>}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">{p.vendor_name || '—'}</td>

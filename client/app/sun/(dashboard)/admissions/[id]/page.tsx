@@ -10,7 +10,7 @@ import { Badge, Skeleton } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate, formatCurrency, formatFullName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/api';
 import {
@@ -159,24 +159,18 @@ export default function AdmissionDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-xs text-muted-foreground block">First Name</span>
-                <span className="font-medium text-foreground">{a.first_name}</span>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground block">Last Name</span>
-                <span className="font-medium text-foreground">{a.last_name || '—'}</span>
-              </div>
+            <div>
+              <span className="text-xs text-muted-foreground block">Full Name (as per ID proof)</span>
+              <span className="font-medium text-foreground">{formatFullName(a.first_name, a.last_name) || '—'}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="text-xs text-muted-foreground block">Phone</span>
+                <span className="text-xs text-muted-foreground block">Mobile Number</span>
                 <span className="font-medium font-mono text-foreground">{a.phone}</span>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground block">Alternate Phone</span>
+                <span className="text-xs text-muted-foreground block">Alternate Mobile</span>
                 <span className="font-medium font-mono text-foreground">{a.alternate_phone || '—'}</span>
               </div>
             </div>
@@ -208,12 +202,12 @@ export default function AdmissionDetailPage() {
           </CardHeader>
           <CardContent className="p-4 space-y-3 text-sm">
             <div>
-              <span className="text-xs text-muted-foreground block">Address Line 1</span>
-              <span className="font-medium text-foreground">{a.address_line1 || '—'}</span>
+              <span className="text-xs text-muted-foreground block">Current Address</span>
+              <span className="font-medium text-foreground">{a.address_line2 || '—'}</span>
             </div>
             <div>
-              <span className="text-xs text-muted-foreground block">Address Line 2</span>
-              <span className="font-medium text-foreground">{a.address_line2 || '—'}</span>
+              <span className="text-xs text-muted-foreground block">Permanent Address</span>
+              <span className="font-medium text-foreground">{a.address_line1 || '—'}</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -244,6 +238,10 @@ export default function AdmissionDetailPage() {
             <div>
               <span className="text-xs text-muted-foreground block">Applied Batch</span>
               <span className="font-semibold text-foreground text-base">{a.batch_name || '—'}</span>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground block">Admission Date</span>
+              <span className="font-medium text-foreground">{a.admission_date ? formatDate(a.admission_date) : '—'}</span>
             </div>
 
             {(a.batch_start_date || a.batch_end_date) && (
