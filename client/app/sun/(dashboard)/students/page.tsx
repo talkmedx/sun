@@ -219,7 +219,7 @@ export default function StudentsPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>Fees committed (₹)</Label>
+                <Label>Course fees (₹)</Label>
                 <Input type="number" step="0.01" placeholder="Auto-fetched when batch selected" {...form.register('fees_committed')} />
               </div>
               <Button type="submit" className="w-full mt-2" disabled={createMutation.isPending}>Create Student</Button>
@@ -320,7 +320,7 @@ export default function StudentsPage() {
               <Card className="bg-muted/20 border border-border/60 shadow-2xs">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground">Total Fees Committed</p>
+                    <p className="text-xs font-medium text-muted-foreground">Total Course Fees</p>
                     <h3 className="text-xl font-bold mt-1 text-blue-600 dark:text-blue-400">
                       {formatCurrency(batchSummary?.total_fees_committed ?? 0)}
                     </h3>

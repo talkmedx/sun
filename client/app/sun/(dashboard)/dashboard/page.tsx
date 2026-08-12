@@ -92,7 +92,7 @@ export default function DashboardPage() {
     : [
         { key: 'total_fees_collected', label: 'Fees Collected', icon: IndianRupee, href: '/reports?tab=fees', currency: true },
         { key: 'pending_fees', label: 'Pending Fees', icon: AlertCircle, href: '/students?filter=pending', currency: true },
-        { key: 'total_fees_committed', label: 'Course Fees Committed', icon: TrendingUp, href: '/reports?tab=fees', currency: true },
+        { key: 'total_fees_committed', label: 'Course Fees', icon: TrendingUp, href: '/reports?tab=fees', currency: true },
         { key: 'current_fy_expenses', label: 'F.Y. Expenses', icon: Wallet, href: '/expenses', currency: true },
         { key: 'financial_year_profit', label: 'F.Y. Profit', icon: TrendingUp, href: '/reports?tab=profit', currency: true },
         { key: 'vendors', label: 'Vendors', icon: Store, href: '/vendors' },

@@ -590,7 +590,7 @@ export default function StudentProfilePage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Fees committed (₹)</Label>
+              <Label>Course fees (₹)</Label>
               <Input type="number" step="0.01" {...editStudentForm.register('fees_committed')} />
             </div>
 
@@ -963,7 +963,7 @@ export default function StudentProfilePage() {
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Fee Financial Overview</span>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-3 rounded-xl bg-card border border-border/60 shadow-2xs">
-                    <p className="text-[11px] font-medium text-muted-foreground">Committed</p>
+                    <p className="text-[11px] font-medium text-muted-foreground">Course fees</p>
                     <p className="font-bold text-sm text-foreground mt-0.5">{formatCurrency(student.fees_committed)}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shadow-2xs">
