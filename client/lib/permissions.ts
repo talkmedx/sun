@@ -1,6 +1,5 @@
 export const CLIENT_ROLES = {
   SUPER_ADMIN: 'super_admin',
-  ADMIN: 'admin',
   STAFF: 'staff',
 } as const;
 
@@ -24,11 +23,12 @@ export const ROLE_NAV: Record<string, NavItemKey[]> = {
     'dashboard', 'students', 'batches', 'courses', 'expenses', 'vendors',
     'products', 'admissions', 'reports', 'roles', 'notifications', 'settings',
   ],
+  staff: ['students', 'products', 'expenses', 'admissions', 'notifications', 'settings'],
+  // leftover DB role — same business access as before, not offered in the UI
   admin: [
     'dashboard', 'students', 'batches', 'courses', 'expenses', 'vendors',
     'products', 'admissions', 'reports', 'notifications', 'settings',
   ],
-  staff: ['students', 'products', 'expenses', 'admissions', 'notifications', 'settings'],
 };
 
 export const ROLE_DESCRIPTIONS = [
@@ -36,11 +36,6 @@ export const ROLE_DESCRIPTIONS = [
     key: 'super_admin',
     label: 'Super Admin',
     description: 'Full access including Roles management and all modules.',
-  },
-  {
-    key: 'admin',
-    label: 'Admin',
-    description: 'Full business access: dashboard, students, batches, reports, and more.',
   },
   {
     key: 'staff',
@@ -89,7 +84,7 @@ export function homeForRole(role: string | undefined | null): string {
 }
 
 export function isAdmin(role: string | undefined | null): boolean {
-  return role === CLIENT_ROLES.SUPER_ADMIN || role === CLIENT_ROLES.ADMIN;
+  return role === CLIENT_ROLES.SUPER_ADMIN;
 }
 
 export function isSuperAdmin(role: string | undefined | null): boolean {

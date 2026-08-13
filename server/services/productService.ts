@@ -59,6 +59,7 @@ export async function listProducts(params: ListParams) {
 export async function getProductSummary() {
   const stockSummary = await queryOne<RowDataPacket>(
     `SELECT
+       COALESCE(SUM(quantity_available), 0) AS units_available,
        COALESCE(SUM(quantity_available * cost_price), 0) AS total_cost_available,
        COALESCE(SUM(quantity_available * selling_price), 0) AS total_selling_available,
        COALESCE(SUM(quantity_available * (selling_price - cost_price)), 0) AS total_profit_available
@@ -68,6 +69,7 @@ export async function getProductSummary() {
 
   const salesSummary = await queryOne<RowDataPacket>(
     `SELECT
+       COALESCE(SUM(quantity), 0) AS units_sold,
        COALESCE(SUM(quantity * unit_cost_price), 0) AS total_cost_sold,
        COALESCE(SUM(total_amount), 0) AS total_selling_sold,
        COALESCE(SUM(total_amount - (quantity * unit_cost_price)), 0) AS total_profit_sold
@@ -76,9 +78,11 @@ export async function getProductSummary() {
   );
 
   return {
+    units_available: Number(stockSummary?.units_available || 0),
     total_cost_available: Number(stockSummary?.total_cost_available || 0),
     total_selling_available: Number(stockSummary?.total_selling_available || 0),
     total_profit_available: Number(stockSummary?.total_profit_available || 0),
+    units_sold: Number(salesSummary?.units_sold || 0),
     total_cost_sold: Number(salesSummary?.total_cost_sold || 0),
     total_selling_sold: Number(salesSummary?.total_selling_sold || 0),
     total_profit_sold: Number(salesSummary?.total_profit_sold || 0),

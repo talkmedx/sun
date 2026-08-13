@@ -32,8 +32,8 @@ const navItems: { href: string; label: string; key: NavItemKey; icon: React.Elem
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar, mobileOpen, closeMobile } = useUIStore();
-  const role = useAuthStore((s) => s.user?.role) || 'admin';
-  const allowed = ROLE_NAV[role] || ROLE_NAV.admin;
+  const role = useAuthStore((s) => s.user?.role) || 'super_admin';
+  const allowed = ROLE_NAV[role] || ROLE_NAV.super_admin;
   const nav = navItems.filter((item) => allowed.includes(item.key));
 
   const { data: pendingAdmissionsData } = useQuery({

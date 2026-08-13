@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Plus, LayoutGrid, List, FileText, Pencil, Trash2, Power } from 'lucide-react';
+import { Plus, LayoutGrid, List, FileText, Pencil, Trash2, Power, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { vendorsApi, expensesApi, batchesApi } from '@/services/api';
+import { vendorsApi, expensesApi, batchesApi, productsApi } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
@@ -15,11 +16,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
+import { useAuthStore } from '@/store';
+import { Product } from '@/types';
 
 export default function VendorDetailPage() {
   const id = Number(useParams().id);
+  const isStaff = useAuthStore((s) => s.user?.role) === 'staff';
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'credits' | 'expenses'>('credits');
+  const [tab, setTab] = useState<'credits' | 'expenses' | 'available' | 'out_of_stock'>('credits');
   const [addCreditOpen, setAddCreditOpen] = useState(false);
   const [editCreditOpen, setEditCreditOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,6 +92,18 @@ export default function VendorDetailPage() {
     queryKey: ['vendor-expenses', id],
     queryFn: async () => (await vendorsApi.expenses(id)).data.data,
     enabled: tab === 'expenses',
+  });
+
+  const stockTab = tab === 'available' || tab === 'out_of_stock';
+  const { data: vendorProducts, isLoading: productsLoading } = useQuery({
+    queryKey: ['vendor-products', id, tab],
+    queryFn: async () =>
+      (await productsApi.list({
+        vendor_id: id,
+        stock_status: tab === 'available' ? 'available' : 'out_of_stock',
+        limit: 200,
+      })).data.data,
+    enabled: stockTab,
   });
 
   const toggleVendorActive = useMutation({
@@ -338,6 +354,8 @@ export default function VendorDetailPage() {
         <div className="flex gap-2">
           <Button size="sm" variant={tab === 'credits' ? 'default' : 'outline'} onClick={() => setTab('credits')}>Credits</Button>
           <Button size="sm" variant={tab === 'expenses' ? 'default' : 'outline'} onClick={() => setTab('expenses')}>Expenses</Button>
+          <Button size="sm" variant={tab === 'available' ? 'default' : 'outline'} onClick={() => setTab('available')}>Available Stock</Button>
+          <Button size="sm" variant={tab === 'out_of_stock' ? 'default' : 'outline'} onClick={() => setTab('out_of_stock')}>Out of Stock</Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -804,6 +822,148 @@ export default function VendorDetailPage() {
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {stockTab && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6 pb-2 sm:pb-2">
+            <div>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Package className="h-4 w-4 text-primary" />
+                {tab === 'available' ? 'Available Stock' : 'Out of Stock'}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Products from this vendor only
+                {vendorProducts?.length ? ` · ${vendorProducts.length} item${vendorProducts.length === 1 ? '' : 's'}` : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/20 shrink-0">
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 sm:h-8 sm:w-8"
+                title="Grid view"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 sm:h-8 sm:w-8"
+                title="Table view"
+                onClick={() => setViewMode('table')}
+              >
+                <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-2 sm:pt-2">
+            {productsLoading ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+              </div>
+            ) : (
+              <>
+                <div className={
+                  viewMode === 'grid'
+                    ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'
+                    : viewMode === 'table'
+                    ? 'hidden'
+                    : 'space-y-3 block md:hidden'
+                }>
+                  {(vendorProducts as Product[] | undefined)?.map((p) => {
+                    const qty = Number(p.quantity_available || 0);
+                    const selling = Number(p.selling_price || 0);
+                    return (
+                      <div key={p.id} className="rounded-lg border border-border/80 p-3 space-y-2 text-xs bg-card shadow-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <Link href={`/sun/products/${p.id}`} className="font-semibold text-sm hover:text-primary">
+                            {p.name}
+                          </Link>
+                          <Badge variant={qty > 0 ? 'secondary' : 'destructive'} className="font-mono shrink-0">
+                            {qty}
+                          </Badge>
+                        </div>
+                        {p.sku && <p className="text-[11px] text-muted-foreground font-mono">SKU: {p.sku}</p>}
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
+                          {!isStaff && (
+                            <div>
+                              <span className="block text-muted-foreground">Cost / unit</span>
+                              <span className="font-medium">{formatCurrency(p.cost_price)}</span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="block text-muted-foreground">Selling / unit</span>
+                            <span className="font-medium">{formatCurrency(selling)}</span>
+                          </div>
+                          <div>
+                            <span className="block text-muted-foreground">Stock value</span>
+                            <span className="font-semibold">{formatCurrency(selling * qty)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!(vendorProducts as Product[] | undefined)?.length && (
+                    <p className="py-4 text-center text-xs text-muted-foreground col-span-full">
+                      {tab === 'available' ? 'No available stock for this vendor' : 'No out-of-stock products for this vendor'}
+                    </p>
+                  )}
+                </div>
+
+                <div className={
+                  viewMode === 'table'
+                    ? 'overflow-x-auto border rounded-lg'
+                    : viewMode === 'grid'
+                    ? 'hidden'
+                    : 'hidden md:block overflow-x-auto border rounded-lg'
+                }>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                        <th className="px-3 py-2.5 font-medium">Product Name</th>
+                        {!isStaff && <th className="px-3 py-2.5 font-medium whitespace-nowrap">Cost Price / unit</th>}
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Selling Price / unit</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Quantity</th>
+                        <th className="px-3 py-2.5 font-medium whitespace-nowrap">Total Selling Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(vendorProducts as Product[] | undefined)?.map((p) => {
+                        const qty = Number(p.quantity_available || 0);
+                        const selling = Number(p.selling_price || 0);
+                        return (
+                          <tr key={p.id} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="px-3 py-2.5">
+                              <Link href={`/sun/products/${p.id}`} className="font-medium hover:text-primary">
+                                {p.name}
+                              </Link>
+                              {p.sku && <div className="text-[11px] text-muted-foreground font-mono">SKU: {p.sku}</div>}
+                            </td>
+                            {!isStaff && <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(p.cost_price)}</td>}
+                            <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(selling)}</td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              <Badge variant={qty > 0 ? 'secondary' : 'destructive'} className="font-mono">{qty}</Badge>
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap font-semibold">{formatCurrency(selling * qty)}</td>
+                          </tr>
+                        );
+                      })}
+                      {!(vendorProducts as Product[] | undefined)?.length && (
+                        <tr>
+                          <td colSpan={isStaff ? 4 : 5} className="py-4 text-center text-xs text-muted-foreground">
+                            {tab === 'available' ? 'No available stock for this vendor' : 'No out-of-stock products for this vendor'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

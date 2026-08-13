@@ -255,6 +255,9 @@ export default function ProductsPage() {
                 <h3 className="text-lg font-bold mt-1 text-foreground">
                   {formatCurrency(summaryData?.total_cost_available || 0)}
                 </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_available || 0).toLocaleString()} units in stock
+                </p>
               </div>
               <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <DollarSign className="h-5 w-5" />
@@ -270,6 +273,9 @@ export default function ProductsPage() {
                 <h3 className="text-lg font-bold mt-1 text-foreground">
                   {formatCurrency(summaryData?.total_selling_available || 0)}
                 </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_available || 0).toLocaleString()} units in stock
+                </p>
               </div>
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <TrendingUp className="h-5 w-5" />
@@ -285,6 +291,9 @@ export default function ProductsPage() {
                 <h3 className="text-lg font-bold mt-1 text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(summaryData?.total_profit_available || 0)}
                 </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_available || 0).toLocaleString()} units in stock
+                </p>
               </div>
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <TrendingUp className="h-5 w-5" />
@@ -300,6 +309,9 @@ export default function ProductsPage() {
                 <h3 className="text-lg font-bold mt-1 text-foreground">
                   {formatCurrency(summaryData?.total_cost_sold || 0)}
                 </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_sold || 0).toLocaleString()} units sold
+                </p>
               </div>
               <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <ShoppingBag className="h-5 w-5" />
@@ -315,6 +327,9 @@ export default function ProductsPage() {
                 <h3 className="text-lg font-bold mt-1 text-foreground">
                   {formatCurrency(summaryData?.total_selling_sold || 0)}
                 </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_sold || 0).toLocaleString()} units sold
+                </p>
               </div>
               <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <ShoppingBag className="h-5 w-5" />
@@ -330,6 +345,9 @@ export default function ProductsPage() {
                 <h3 className="text-lg font-bold mt-1 text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(summaryData?.total_profit_sold || 0)}
                 </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_sold || 0).toLocaleString()} units sold
+                </p>
               </div>
               <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <TrendingUp className="h-5 w-5" />

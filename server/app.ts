@@ -50,6 +50,7 @@ app.use(
     standardHeaders: true,
     legacyHeaders: false,
     validate: false,
+    skip: () => config.env !== 'production',
     message: { success: false, message: 'Too many requests, please try again later' },
   })
 );

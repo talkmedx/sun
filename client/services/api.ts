@@ -104,9 +104,11 @@ export const productsApi = {
   summary: () =>
     api.get<
       ApiResponse<{
+        units_available: number;
         total_cost_available: number;
         total_selling_available: number;
         total_profit_available: number;
+        units_sold: number;
         total_cost_sold: number;
         total_selling_sold: number;
         total_profit_sold: number;
@@ -169,4 +171,12 @@ export const usersApi = {
   updateRole: (id: number, role: string) => api.patch(`/users/${id}/role`, { role }),
   setActive: (id: number, is_active: boolean) =>
     api.patch(`/users/${id}/active`, { is_active }),
+  updateUser: (id: number, data: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    role?: string;
+  }) => api.put(`/users/${id}`, data),
+  deleteUser: (id: number) => api.delete(`/users/${id}`),
 };

@@ -18,6 +18,12 @@ export function errorHandler(
     return fail(res, err.message, 400);
   }
 
+  const errno = (err as { errno?: number; code?: string }).errno;
+  const code = (err as { code?: string }).code;
+  if (errno === 1062 || code === 'ER_DUP_ENTRY') {
+    return fail(res, 'A record with this value already exists', 409);
+  }
+
   console.error('[ERROR]', err);
 
   const message =

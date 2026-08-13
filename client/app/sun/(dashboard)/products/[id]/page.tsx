@@ -16,10 +16,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
+import { useAuthStore } from '@/store';
 
 export default function ProductDetailPage() {
   const id = Number(useParams().id);
   const qc = useQueryClient();
+  const isStaff = useAuthStore((s) => s.user?.role) === 'staff';
   
   const [editOpen, setEditOpen] = useState(false);
   const [stockType, setStockType] = useState<'add' | 'remove'>('add');
@@ -212,10 +214,16 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit / unit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(profitPerUnit)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit %</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{profitPercent}%</p></CardContent></Card>
+        {!isStaff && (
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit / unit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(profitPerUnit)}</p></CardContent></Card>
+        )}
+        {!isStaff && (
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit %</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{profitPercent}%</p></CardContent></Card>
+        )}
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Value</p><p className="text-xl font-semibold">{formatCurrency(stockValue)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Profit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stockProfit)}</p></CardContent></Card>
+        {!isStaff && (
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Profit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stockProfit)}</p></CardContent></Card>
+        )}
       </div>
 
       {product.description && (

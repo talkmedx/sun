@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +14,7 @@ import { getErrorMessage } from '@/lib/api';
 import { AdmissionFormFields, type AdmissionFormValues } from '@/components/admissions/AdmissionFormFields';
 import {
   admissionFormDefaults,
+  admissionFormSchema,
   buildAdmissionFormData,
   type AdmissionProofItem,
 } from '@/components/admissions/admission-form-utils';
@@ -24,6 +26,7 @@ export default function PublicAdmissionPage() {
   const [photo, setPhoto] = useState<File | null>(null);
 
   const form = useForm<AdmissionFormValues>({
+    resolver: zodResolver(admissionFormSchema),
     defaultValues: admissionFormDefaults,
   });
 

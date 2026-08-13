@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Search, LayoutGrid, List, Loader2, MapPin, Eye, Plus, Copy, Upload, User, Phone, Mail, Layers, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { admissionsApi, batchesApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { formatDate, formatFullName } from '@/lib/utils';
 import { AdmissionFormFields, type AdmissionFormValues } from '@/components/admissions/AdmissionFormFields';
 import {
   admissionFormDefaults,
+  admissionFormSchema,
   buildAdmissionFormData,
   type AdmissionProofItem,
 } from '@/components/admissions/admission-form-utils';
@@ -52,6 +54,7 @@ export default function AdmissionsPage() {
   }, [debouncedSearch, status]);
 
   const addForm = useForm<AdmissionFormValues>({
+    resolver: zodResolver(admissionFormSchema),
     defaultValues: admissionFormDefaults,
   });
 

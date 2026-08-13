@@ -12,7 +12,7 @@ import {
 import {
   studentSchema, batchSchema, batchBaseSchema, courseSchema, expenseSchema, vendorSchema, vendorCreditSchema,
   productSchema, feeSchema, studentProductSchema, admissionSchema, rejectAdmissionSchema,
-  createStaffSchema, createUserSchema, updateRoleSchema,
+  createStaffSchema, createUserSchema, updateRoleSchema, updateUserSchema,
 } from '../validations/schemas';
 import { MODULE_ROLES } from '../config/permissions';
 import authRoutes from './authRoutes';
@@ -21,6 +21,7 @@ const router = Router();
 
 const adminOnly = authorize(...MODULE_ROLES.dashboard);
 const staffOk = authorize(...MODULE_ROLES.expenses);
+const studentsOk = authorize(...MODULE_ROLES.students);
 const usersAdmin = authorize(...MODULE_ROLES.users);
 
 router.use('/auth', authRoutes);
@@ -64,6 +65,8 @@ router.post('/users', usersAdmin, validate(createUserSchema), usersController.cr
 router.post('/users/staff', usersAdmin, validate(createStaffSchema), usersController.createStaff);
 router.patch('/users/:id/role', usersAdmin, validate(updateRoleSchema), usersController.updateRole);
 router.patch('/users/:id/active', usersAdmin, usersController.setActive);
+router.put('/users/:id', usersAdmin, validate(updateUserSchema), usersController.updateUser);
+router.delete('/users/:id', usersAdmin, usersController.deleteUser);
 
 // Dashboard — admin only
 router.get('/dashboard/summary', adminOnly, dashboard.summary);
@@ -71,25 +74,25 @@ router.get('/dashboard/charts', adminOnly, dashboard.charts);
 router.get('/dashboard/batch-profit/:batchId', adminOnly, dashboard.batchProfit);
 router.get('/dashboard/fy-profit', adminOnly, dashboard.fyProfit);
 
-// Students — admin only
-router.get('/students', adminOnly, students.list);
-router.get('/students/:id', adminOnly, students.get);
-router.post('/students', adminOnly, validate(studentSchema), students.create);
-router.put('/students/:id', adminOnly, validate(studentSchema.partial()), students.update);
-router.delete('/students/:id', adminOnly, students.remove);
-router.post('/students/:id/photo', adminOnly, uploadProfile.single('photo'), students.photo);
-router.get('/students/:id/fees', adminOnly, students.fees);
-router.post('/students/:id/fees', adminOnly, uploadPayment.single('screenshot'), validate(feeSchema), students.addFee);
-router.put('/students/:id/fees/:feeId', adminOnly, uploadPayment.single('screenshot'), students.updateFee);
-router.delete('/students/:id/fees/:feeId', adminOnly, students.deleteFee);
-router.get('/students/:id/products', adminOnly, students.products);
-router.post('/students/:id/products', adminOnly, validate(studentProductSchema), students.addProduct);
-router.put('/students/:id/products/:productId', adminOnly, students.updateProduct);
-router.delete('/students/:id/products/:productId', adminOnly, students.deleteProduct);
-router.get('/students/:id/documents', adminOnly, students.documents);
-router.post('/students/:id/documents', adminOnly, uploadDocument.single('file'), students.addDocument);
-router.put('/students/:id/documents/:docId', adminOnly, uploadDocument.single('file'), students.updateDocument);
-router.delete('/students/:id/documents/:docId', adminOnly, students.deleteDocument);
+// Students — super admin + staff
+router.get('/students', studentsOk, students.list);
+router.get('/students/:id', studentsOk, students.get);
+router.post('/students', studentsOk, validate(studentSchema), students.create);
+router.put('/students/:id', studentsOk, validate(studentSchema.partial()), students.update);
+router.delete('/students/:id', studentsOk, students.remove);
+router.post('/students/:id/photo', studentsOk, uploadProfile.single('photo'), students.photo);
+router.get('/students/:id/fees', studentsOk, students.fees);
+router.post('/students/:id/fees', studentsOk, uploadPayment.single('screenshot'), validate(feeSchema), students.addFee);
+router.put('/students/:id/fees/:feeId', studentsOk, uploadPayment.single('screenshot'), students.updateFee);
+router.delete('/students/:id/fees/:feeId', studentsOk, students.deleteFee);
+router.get('/students/:id/products', studentsOk, students.products);
+router.post('/students/:id/products', studentsOk, validate(studentProductSchema), students.addProduct);
+router.put('/students/:id/products/:productId', studentsOk, students.updateProduct);
+router.delete('/students/:id/products/:productId', studentsOk, students.deleteProduct);
+router.get('/students/:id/documents', studentsOk, students.documents);
+router.post('/students/:id/documents', studentsOk, uploadDocument.single('file'), students.addDocument);
+router.put('/students/:id/documents/:docId', studentsOk, uploadDocument.single('file'), students.updateDocument);
+router.delete('/students/:id/documents/:docId', studentsOk, students.deleteDocument);
 
 // Courses — full CRUD admin only; dropdown allowed for staff
 router.get('/courses', staffOk, courses.list);

@@ -4,6 +4,8 @@ import { query, queryOne, execute } from '../config/database';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AppError, UnauthorizedError, NotFoundError } from '../utils/errors';
 import { generateToken } from '../helpers/generators';
+import { persistPassword, ensurePasswordColumn } from './usersService';
+import { encryptPassword } from '../helpers/passwordDisplay';
 
 interface UserRow extends RowDataPacket {
   id: number;
@@ -114,11 +116,8 @@ export async function changePassword(
   const valid = await bcrypt.compare(currentPassword, user.password_hash);
   if (!valid) throw new AppError('Current password is incorrect', 400);
 
-  const hash = await bcrypt.hash(newPassword, 12);
-  await execute(
-    `UPDATE users SET password_hash = :hash, refresh_token = NULL WHERE id = :id`,
-    { hash, id: userId }
-  );
+  await persistPassword(userId, newPassword);
+  await execute(`UPDATE users SET refresh_token = NULL WHERE id = :id`, { id: userId });
 }
 
 export async function forgotPassword(email: string) {
@@ -156,35 +155,37 @@ export async function resetPassword(token: string, newPassword: string) {
 
   if (!user) throw new AppError('Invalid or expired reset token', 400);
 
-  const hash = await bcrypt.hash(newPassword, 12);
+  await persistPassword(user.id, newPassword);
   await execute(
-    `UPDATE users SET password_hash = :hash, reset_token = NULL, reset_token_expires = NULL, refresh_token = NULL
+    `UPDATE users SET reset_token = NULL, reset_token_expires = NULL, refresh_token = NULL
      WHERE id = :id`,
-    { hash, id: user.id }
+    { id: user.id }
   );
 }
 
 /** Ensure default admin exists with known password */
 export async function ensureDefaultAdmin() {
+  await ensurePasswordColumn();
   const existing = await queryOne<UserRow>(
     `SELECT id FROM users WHERE email = :email AND deleted_at IS NULL`,
     { email: 'admin@komalsmakeovers.com' }
   );
 
-  const hash = await bcrypt.hash('Admin@123', 12);
+  const plain = 'Admin@123';
+  const hash = await bcrypt.hash(plain, 12);
+  const encrypted = encryptPassword(plain);
 
   if (!existing) {
     await execute(
-      `INSERT INTO users (name, email, phone, password_hash, role, is_active)
-       VALUES ('Komal Admin', 'admin@komalsmakeovers.com', '9876543210', :hash, 'super_admin', 1)`,
-      { hash }
+      `INSERT INTO users (name, email, phone, password_hash, password_encrypted, role, is_active)
+       VALUES ('Komal Admin', 'admin@komalsmakeovers.com', '9876543210', :hash, :encrypted, 'super_admin', 1)`,
+      { hash, encrypted }
     );
   } else {
-    // Keep password in sync for local/dev seed convenience
-    await execute(`UPDATE users SET password_hash = :hash WHERE id = :id`, {
-      hash,
-      id: existing.id,
-    });
+    await execute(
+      `UPDATE users SET password_hash = :hash, password_encrypted = :encrypted WHERE id = :id`,
+      { hash, encrypted, id: existing.id }
+    );
   }
 }
 

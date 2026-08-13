@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate, formatFullName, fullNameToRecord } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
+import { useAuthStore } from '@/store';
 
 const DOC_TYPES = ['Aadhar Card', 'Pan Card', 'Driving License', 'Voting Card', 'Rent Agreement', 'Other'];
 
@@ -27,6 +28,7 @@ export default function StudentProfilePage() {
   const params = useParams();
   const id = Number(params.id);
   const qc = useQueryClient();
+  const isStaff = useAuthStore((s) => s.user?.role) === 'staff';
   const [tab, setTab] = useState<'fees' | 'products' | 'documents'>('fees');
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
 
@@ -981,7 +983,7 @@ export default function StudentProfilePage() {
                 </div>
               </div>
 
-              {/* Product Profits Highlight Section */}
+              {!isStaff && (
               <div className="w-full pt-2 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
@@ -1002,6 +1004,7 @@ export default function StudentProfilePage() {
                   </div>
                 </div>
               </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -1411,7 +1414,9 @@ export default function StudentProfilePage() {
                 <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
                   <div>
                     <CardTitle className="text-base font-semibold">Product Purchases</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">Purchased items and profit calculations</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isStaff ? 'Purchased items' : 'Purchased items and profit calculations'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/20">
                     <Button
@@ -1469,8 +1474,8 @@ export default function StudentProfilePage() {
                             <div className="flex justify-between"><span className="text-muted-foreground">Cost Price / unit</span><span className="font-medium">{formatCurrency(costUnit)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Selling Price / unit</span><span className="font-medium">{formatCurrency(sellUnit)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Selling Price</span><span className="font-semibold text-foreground">{formatCurrency(totalSelling)}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Total Profit</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Profit %</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{profPct}%</span></div>
+                            {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Total Profit</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</span></div>}
+                            {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Profit %</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{profPct}%</span></div>}
                           </div>
 
                           <div className="flex gap-2 pt-2 border-t border-border/50">
@@ -1519,8 +1524,8 @@ export default function StudentProfilePage() {
                           <th className="px-4 py-3 font-semibold">Selling Price/unit</th>
                           <th className="px-4 py-3 font-semibold">Qty</th>
                           <th className="px-4 py-3 font-semibold">Total Selling Price</th>
-                          <th className="px-4 py-3 font-semibold">Total Profit</th>
-                          <th className="px-4 py-3 font-semibold">Profit %</th>
+                          {!isStaff && <th className="px-4 py-3 font-semibold">Total Profit</th>}
+                          {!isStaff && <th className="px-4 py-3 font-semibold">Profit %</th>}
                           <th className="px-4 py-3 font-semibold text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1543,8 +1548,8 @@ export default function StudentProfilePage() {
                               <td className="px-4 py-3.5">{formatCurrency(sellUnit)}</td>
                               <td className="px-4 py-3.5 font-semibold"><Badge variant="secondary">{p.quantity}</Badge></td>
                               <td className="px-4 py-3.5 font-semibold">{formatCurrency(totalSelling)}</td>
-                              <td className="px-4 py-3.5 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</td>
-                              <td className="px-4 py-3.5 font-bold text-emerald-600 dark:text-emerald-400">{profPct}%</td>
+                              {!isStaff && <td className="px-4 py-3.5 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</td>}
+                              {!isStaff && <td className="px-4 py-3.5 font-bold text-emerald-600 dark:text-emerald-400">{profPct}%</td>}
                               <td className="px-4 py-3.5 text-right">
                                 <div className="flex items-center justify-end gap-1">
                                   <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit purchase" onClick={() => handleEditProductClick(p)}>
@@ -1567,7 +1572,7 @@ export default function StudentProfilePage() {
                           );
                         })}
                         {!purchases?.length && (
-                          <tr><td colSpan={10} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
+                          <tr><td colSpan={isStaff ? 8 : 10} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
                         )}
                       </tbody>
                     </table>

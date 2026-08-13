@@ -63,3 +63,26 @@ export async function setActive(req: Request, res: Response, next: NextFunction)
     next(e);
   }
 }
+
+export async function updateUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    requireSuperAdmin(req);
+    return success(
+      res,
+      await usersService.updateUser(Number(req.params.id), req.body),
+      'User updated'
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function deleteUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    requireSuperAdmin(req);
+    await usersService.deleteUser(Number(req.params.id), Number(req.user?.userId));
+    return success(res, null, 'User deleted');
+  } catch (e) {
+    next(e);
+  }
+}

@@ -6,6 +6,7 @@ export interface User {
   role: string;
   avatar_url?: string | null;
   is_active?: number;
+  password?: string | null;
 }
 
 export interface Course {

@@ -169,11 +169,26 @@ export const createUserSchema = z.object({
   password: z.string().min(8).regex(/^(?=.*[A-Za-z])(?=.*\d)/, {
     message: 'Password must contain letters and numbers',
   }),
-  role: z.enum(['admin', 'staff']),
+  role: z.enum(['super_admin', 'staff']),
 });
 
 export const updateRoleSchema = z.object({
-  role: z.enum(['admin', 'staff']),
+  role: z.enum(['super_admin', 'staff']),
+});
+
+export const updateUserSchema = z.object({
+  name: z.string().min(1).max(150).optional(),
+  email: z.string().email().optional(),
+  phone: phoneSchema.optional().nullable().or(z.literal('')),
+  password: z
+    .string()
+    .min(8)
+    .regex(/^(?=.*[A-Za-z])(?=.*\d)/, {
+      message: 'Password must contain letters and numbers',
+    })
+    .optional()
+    .or(z.literal('')),
+  role: z.enum(['super_admin', 'staff']).optional(),
 });
 
 export const courseSchema = z.object({
