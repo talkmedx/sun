@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/api';
 import {
   User, Phone, Mail, MapPin, Calendar, Layers, FileText, CheckCircle2,
-  XCircle, Link2, ExternalLink, IndianRupee, ShieldCheck, ArrowLeft, AlertCircle, Loader2
+  XCircle, ExternalLink, IndianRupee, ShieldCheck, ArrowLeft, AlertCircle, Loader2
 } from 'lucide-react';
 
 export default function AdmissionDetailPage() {
@@ -52,17 +52,6 @@ export default function AdmissionDetailPage() {
       qc.invalidateQueries({ queryKey: ['pending-admissions-count'] });
       setRejectOpen(false);
       setRejectionReason('');
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
-  const editLink = useMutation({
-    mutationFn: (id: number) => admissionsApi.editLink(id),
-    onSuccess: (res) => {
-      const url = `${window.location.origin}${res.data.data.editUrl}`;
-      navigator.clipboard.writeText(url);
-      toast.success('Edit link copied to clipboard & opening form');
-      window.open(url, '_blank');
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -105,15 +94,6 @@ export default function AdmissionDetailPage() {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => editLink.mutate(a.id)}
-            disabled={editLink.isPending}
-          >
-            <Link2 className="h-4 w-4 mr-1.5" /> Edit Link
-          </Button>
-
           {a.student_id && (
             <Link href={`/sun/students/${a.student_id}`}>
               <Button variant="secondary" size="sm">
