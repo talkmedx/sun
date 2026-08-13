@@ -37,7 +37,7 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { email: 'admin@komalsmakeovers.com', password: 'Admin@123' },
+    defaultValues: { email: '', password: '' },
   });
 
   async function onSubmit(values: FormData) {
@@ -83,20 +83,46 @@ export default function LoginPage() {
             <CardDescription>Enter your credentials to access the dashboard</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form
+              method="post"
+              action="/sun/login"
+              autoComplete="on"
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-4"
+            >
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" {...register('email')} />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="you@example.com"
+                  {...register('email')}
+                />
                 {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                  <Input id="password" type={show ? 'text' : 'password'} {...register('password')} />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={show ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    className="pr-10"
+                    {...register('password')}
+                  />
                   <button
                     type="button"
+                    tabIndex={-1}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     onClick={() => setShow((s) => !s)}
+                    aria-label={show ? 'Hide password' : 'Show password'}
                   >
                     {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
