@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { RowDataPacket } from 'mysql2';
 import { query, queryOne, execute } from '../config/database';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
-import { AppError, UnauthorizedError, NotFoundError } from '../utils/errors';
+import { AppError, UnauthorizedError, NotFoundError, ConflictError } from '../utils/errors';
 import { generateToken } from '../helpers/generators';
 import { persistPassword, ensurePasswordColumn } from './usersService';
 import { encryptPassword } from '../helpers/passwordDisplay';
@@ -21,6 +21,29 @@ interface UserRow extends RowDataPacket {
   reset_token_expires: string | null;
 }
 
+async function assertNoOtherActiveSession(userId: number) {
+  const others = await query<UserRow[]>(
+    `SELECT id, name, email, refresh_token FROM users
+     WHERE refresh_token IS NOT NULL
+       AND deleted_at IS NULL
+       AND id <> :id`,
+    { id: userId }
+  );
+
+  for (const other of others) {
+    if (!other.refresh_token) continue;
+    try {
+      verifyRefreshToken(other.refresh_token);
+    } catch {
+      await execute(`UPDATE users SET refresh_token = NULL WHERE id = :id`, { id: other.id });
+      continue;
+    }
+    throw new ConflictError(
+      'Another user is already logged in. Please ask them to log out and try again.'
+    );
+  }
+}
+
 export async function login(email: string, password: string) {
   const user = await queryOne<UserRow>(
     `SELECT * FROM users WHERE email = :email AND deleted_at IS NULL LIMIT 1`,
@@ -35,6 +58,8 @@ export async function login(email: string, password: string) {
   if (!valid) {
     throw new UnauthorizedError('Invalid email or password');
   }
+
+  await assertNoOtherActiveSession(user.id);
 
   const payload = { userId: user.id, email: user.email, role: user.role };
   const accessToken = signAccessToken(payload);

@@ -30,6 +30,7 @@ export default function LoginPage() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -42,6 +43,7 @@ export default function LoginPage() {
 
   async function onSubmit(values: FormData) {
     setLoading(true);
+    setFormError(null);
     try {
       const { data } = await authApi.login(values.email, values.password);
       setAuth(data.data.user, data.data.accessToken, data.data.refreshToken);
@@ -50,7 +52,9 @@ export default function LoginPage() {
       const home = homeForRole(data.data.user.role);
       router.push(data.data.user.role === 'staff' ? home : next || home);
     } catch (err) {
-      toast.error(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setFormError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -134,6 +138,11 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
+              {formError && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {formError}
+                </p>
+              )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Sign in
