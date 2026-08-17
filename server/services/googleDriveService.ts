@@ -385,32 +385,36 @@ export async function saveAppCredentials(clientId: string, clientSecret: string,
   }
 }
 
-export async function connectWithCredentials(opts: {
-  clientId: string;
-  clientSecret: string;
-  refreshToken?: string;
-}) {
+export async function connectWithCredentials(
+  opts: {
+    clientId: string;
+    clientSecret: string;
+    refreshToken?: string;
+  },
+  hostHeader?: string
+) {
   await saveAppCredentials(opts.clientId, opts.clientSecret, opts.refreshToken);
   folderCache.clear();
 
   const drive = await getDrive();
-  if (!drive) {
-    const status = await getDriveStatus();
+  if (drive) {
+    const about = await drive.about.get({ fields: 'user(emailAddress,displayName)' });
+    const email = about.data.user?.emailAddress || config.googleDrive.accountEmail;
+    cachedEmail = email;
+    await upsertSetting(SETTING_EMAIL, email, 'Connected Google Drive account');
     return {
-      ...status,
-      connected: false,
-      appConfigured: true,
+      ...(await getDriveStatus(hostHeader)),
+      connected: true,
+      email,
+      authUrl: null as string | null,
     };
   }
 
-  const about = await drive.about.get({ fields: 'user(emailAddress,displayName)' });
-  const email = about.data.user?.emailAddress || config.googleDrive.accountEmail;
-  cachedEmail = email;
-  await upsertSetting(SETTING_EMAIL, email, 'Connected Google Drive account');
+  const { authUrl } = await startConnect(hostHeader);
   return {
-    ...(await getDriveStatus()),
-    connected: true,
-    email,
+    ...(await getDriveStatus(hostHeader)),
+    connected: false,
+    authUrl,
   };
 }
 

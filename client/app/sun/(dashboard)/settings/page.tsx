@@ -86,6 +86,10 @@ export default function SettingsPage() {
     try {
       setConnecting(true);
       const { data } = await settingsApi.googleDriveConnect({ clientId: id, clientSecret: secret });
+      if (data.data.authUrl) {
+        window.location.href = data.data.authUrl;
+        return;
+      }
       toast.success(data.data.email ? `Google Drive connected as ${data.data.email}` : 'Google Drive connected');
       setClientSecret('');
       qc.invalidateQueries({ queryKey: ['google-drive-status'] });
@@ -283,7 +287,8 @@ export default function SettingsPage() {
                   <div className="space-y-3 rounded-xl border border-border/50 p-4">
                     <p className="text-sm font-medium">Google Cloud credentials</p>
                     <p className="text-xs text-muted-foreground">
-                      Client ID is already filled. Paste only the Client secret, then click Connect Google Drive.
+                      Client ID is already filled. Paste the Client secret, then click Connect. Allow access once as{' '}
+                      <strong>talkmedx@gmail.com</strong> — after that, uploads go to Drive automatically.
                     </p>
                     <div className="hidden" aria-hidden="true">
                       <input type="text" name="username" autoComplete="username" />
