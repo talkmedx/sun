@@ -440,7 +440,7 @@ export async function startConnect(hostHeader?: string): Promise<{ authUrl: stri
 
 export async function handleOAuthCallback(code: string, state: string, hostHeader?: string): Promise<string> {
   const expected = await getSetting(SETTING_OAUTH_STATE);
-  if (!expected || expected !== state) {
+  if (expected && state && expected !== state) {
     throw new Error('Invalid Google Drive OAuth state');
   }
 
