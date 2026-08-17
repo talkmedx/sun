@@ -190,6 +190,7 @@ export const settingsApi = {
       expectedEmail: string;
       rootFolder: string;
       folderPattern: string;
+      redirectUri: string;
       usingServiceAccount: boolean;
     }>>('/settings/google-drive'),
   googleDriveConnect: () => api.post<ApiResponse<{ authUrl: string }>>('/settings/google-drive/connect'),

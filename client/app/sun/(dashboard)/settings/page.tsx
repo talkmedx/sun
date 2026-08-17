@@ -255,11 +255,13 @@ export default function SettingsPage() {
                     <li>Create an OAuth client of type Web application.</li>
                     <li>
                       Add redirect URI{' '}
-                      <code className="rounded bg-muted px-1">http://localhost:5001/api/v1/settings/google-drive/callback</code>
+                      <code className="rounded bg-muted px-1">
+                        {driveQuery.data?.redirectUri || 'https://vanityvow.com/api/v1/settings/google-drive/callback'}
+                      </code>
                     </li>
                     <li>
                       Put <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_ID</code> and{' '}
-                      <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_SECRET</code> in{' '}
+                      <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_SECRET</code> in the live{' '}
                       <code className="rounded bg-muted px-1">server/.env</code>, then restart the API.
                     </li>
                     <li>Click Connect and sign in as talkmedx@gmail.com.</li>

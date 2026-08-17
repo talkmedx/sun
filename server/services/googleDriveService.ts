@@ -277,6 +277,7 @@ export async function getDriveStatus() {
     expectedEmail: config.googleDrive.accountEmail,
     rootFolder: config.googleDrive.rootFolder,
     folderPattern: '{student name} {DD-MM-YYYY}',
+    redirectUri: config.googleDrive.redirectUri,
     usingServiceAccount: hasServiceAccount(),
   };
 }
