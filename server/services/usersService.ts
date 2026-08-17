@@ -25,7 +25,7 @@ function isDuplicateEmailError(err: unknown) {
 }
 
 const USER_COLUMNS = `id, name, email, phone, role, is_active, last_login_at, created_at, password_encrypted`;
-const ASSIGNABLE_ROLES = new Set([ROLES.SUPER_ADMIN, ROLES.STAFF]);
+const ASSIGNABLE_ROLES = new Set<string>([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.STAFF]);
 
 let passwordColumnEnsured = false;
 export async function ensurePasswordColumn() {
@@ -61,7 +61,7 @@ export async function listUsers() {
   const rows = await query<UserRow[]>(
     `SELECT ${USER_COLUMNS}
      FROM users WHERE deleted_at IS NULL ORDER BY
-       FIELD(role, 'super_admin', 'staff'), name`
+       FIELD(role, 'super_admin', 'admin', 'staff'), name`
   );
   return rows.map(toPublicUser);
 }
@@ -75,8 +75,8 @@ export async function createUser(data: {
 }) {
   await ensurePasswordColumn();
   const role = data.role || ROLES.STAFF;
-  if (!ASSIGNABLE_ROLES.has(role as typeof ROLES.STAFF)) {
-    throw new AppError('Invalid role. Choose Super Admin or Staff Member.', 400);
+  if (!ASSIGNABLE_ROLES.has(role)) {
+    throw new AppError('Invalid role. Choose Super Admin, Admin, or Staff Member.', 400);
   }
 
   const email = data.email.toLowerCase().trim();
@@ -162,8 +162,8 @@ export async function updateUser(
   if (!user) throw new NotFoundError('User');
 
   if (data.role && data.role !== user.role) {
-    if (!ASSIGNABLE_ROLES.has(data.role as typeof ROLES.STAFF)) {
-      throw new AppError('Invalid role. Choose Super Admin or Staff Member.', 400);
+    if (!ASSIGNABLE_ROLES.has(data.role)) {
+      throw new AppError('Invalid role. Choose Super Admin, Admin, or Staff Member.', 400);
     }
     if (user.role === ROLES.SUPER_ADMIN && data.role !== ROLES.SUPER_ADMIN) {
       const countRow = await queryOne<RowDataPacket>(

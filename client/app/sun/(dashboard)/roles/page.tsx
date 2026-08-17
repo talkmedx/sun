@@ -15,16 +15,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuthStore } from '@/store';
 import { getErrorMessage } from '@/lib/api';
-import { isSuperAdmin, ROLE_DESCRIPTIONS } from '@/lib/permissions';
+import { isSuperAdmin, ROLE_DESCRIPTIONS, roleLabel } from '@/lib/permissions';
 import { User } from '@/types';
 import { Pagination } from '@/components/ui/pagination';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const roleBadge = (role: string) =>
-  (role === 'super_admin' ? 'default' : 'secondary') as 'default' | 'secondary';
-
-const roleLabel = (role: string) =>
-  (role === 'super_admin' ? 'Super Admin' : 'Staff Member');
+  (role === 'super_admin' ? 'default' : role === 'admin' ? 'outline' : 'secondary') as
+    | 'default'
+    | 'outline'
+    | 'secondary';
 
 type UserFormValues = {
   name: string;
@@ -134,8 +134,7 @@ export default function RolesPage() {
       !debouncedSearch ||
       u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       u.email.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const normalizedRole = u.role === 'super_admin' ? 'super_admin' : 'staff';
-    const matchesRole = roleFilter === 'all' || normalizedRole === roleFilter;
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
 
@@ -212,7 +211,7 @@ export default function RolesPage() {
       email: u.email || '',
       phone: u.phone || '',
       password: '',
-      role: u.role === 'super_admin' ? 'super_admin' : 'staff',
+      role: u.role || 'staff',
     });
     setShowEditPassword(false);
     setEditOpen(true);
@@ -349,11 +348,12 @@ export default function RolesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="staff">Staff Member</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Super Admin: full access including roles. Staff Member: Students, Products, Expenses, and Admissions.
+                  Super Admin: full access including roles. Admin: all modules except Roles. Staff Member: Students, Products, Expenses, and Admissions.
                 </p>
               </div>
               <Button type="submit" className="w-full" disabled={createUser.isPending}>
@@ -365,7 +365,7 @@ export default function RolesPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {ROLE_DESCRIPTIONS.map((r) => (
           <Card key={r.key}>
             <CardContent className="flex items-start gap-3 p-4">
@@ -431,6 +431,7 @@ export default function RolesPage() {
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="staff">Staff Member</SelectItem>
               </SelectContent>
             </Select>
@@ -610,6 +611,7 @@ export default function RolesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="staff">Staff Member</SelectItem>
                 </SelectContent>
               </Select>

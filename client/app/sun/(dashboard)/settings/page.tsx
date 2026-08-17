@@ -1,22 +1,69 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { ShieldCheck, KeyRound, User as UserIcon } from 'lucide-react';
-import { authApi } from '@/services/api';
+import { ShieldCheck, KeyRound, User as UserIcon, Cloud, Loader2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authApi, settingsApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store';
 import { getErrorMessage } from '@/lib/api';
+import { isAdmin } from '@/lib/permissions';
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
+  const qc = useQueryClient();
+  const [connecting, setConnecting] = useState(false);
+  const canManageDrive = isAdmin(user?.role);
 
   const passwordForm = useForm({
     defaultValues: { currentPassword: '', newPassword: '', confirm: '' },
   });
+
+  const driveQuery = useQuery({
+    queryKey: ['google-drive-status'],
+    queryFn: async () => (await settingsApi.googleDriveStatus()).data.data,
+    enabled: canManageDrive,
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('drive') === 'connected') {
+      const email = params.get('email');
+      toast.success(email ? `Google Drive connected as ${email}` : 'Google Drive connected');
+      qc.invalidateQueries({ queryKey: ['google-drive-status'] });
+      window.history.replaceState({}, '', '/sun/settings');
+    } else if (params.get('drive') === 'error') {
+      toast.error(params.get('message') || 'Google Drive connect failed');
+      window.history.replaceState({}, '', '/sun/settings');
+    }
+  }, [qc]);
+
+  const disconnectDrive = useMutation({
+    mutationFn: () => settingsApi.googleDriveDisconnect(),
+    onSuccess: () => {
+      toast.success('Google Drive disconnected');
+      qc.invalidateQueries({ queryKey: ['google-drive-status'] });
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  async function connectDrive() {
+    try {
+      setConnecting(true);
+      const { data } = await settingsApi.googleDriveConnect();
+      const url = data.data.authUrl;
+      if (!url) throw new Error('Missing Google authorization URL');
+      window.location.href = url;
+    } catch (e) {
+      setConnecting(false);
+      toast.error(getErrorMessage(e));
+    }
+  }
 
   async function onPasswordSubmit(values: {
     currentPassword: string;
@@ -39,9 +86,11 @@ export default function SettingsPage() {
   const roleLabel =
     user?.role === 'super_admin'
       ? 'Super Admin'
-      : user?.role === 'staff'
-        ? 'Staff Member'
-        : user?.role || '—';
+      : user?.role === 'admin'
+        ? 'Admin'
+        : user?.role === 'staff'
+          ? 'Staff Member'
+          : user?.role || '—';
 
   return (
     <div className="space-y-6">
@@ -146,6 +195,81 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {canManageDrive && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Cloud className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Google Drive</CardTitle>
+            </div>
+            <CardDescription>
+              Admission photos, proofs, and other panel documents are stored in{' '}
+              <span className="font-medium text-foreground">komal&apos;s Makeover / student name current-date</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {driveQuery.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/50 bg-muted/30 p-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm">
+                        {driveQuery.data?.connected ? 'Connected' : 'Not connected'}
+                      </p>
+                      <Badge variant={driveQuery.data?.connected ? 'success' : 'secondary'}>
+                        {driveQuery.data?.connected ? 'Active' : 'Off'}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {driveQuery.data?.connected
+                        ? `Saving to ${driveQuery.data.email || driveQuery.data.expectedEmail}`
+                        : `Connect ${driveQuery.data?.expectedEmail || 'talkmedx@gmail.com'} so new documents go to Google Drive.`}
+                    </p>
+                  </div>
+                  {driveQuery.data?.connected ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => disconnectDrive.mutate()}
+                      disabled={disconnectDrive.isPending}
+                    >
+                      {disconnectDrive.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+                      Disconnect
+                    </Button>
+                  ) : (
+                    <Button onClick={connectDrive} disabled={connecting || !driveQuery.data?.appConfigured}>
+                      {connecting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+                      Connect Google Drive
+                    </Button>
+                  )}
+                </div>
+
+                {!driveQuery.data?.appConfigured && (
+                  <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+                    <li>Open Google Cloud Console and create (or pick) a project.</li>
+                    <li>Enable the Google Drive API.</li>
+                    <li>Create an OAuth client of type Web application.</li>
+                    <li>
+                      Add redirect URI{' '}
+                      <code className="rounded bg-muted px-1">http://localhost:5001/api/v1/settings/google-drive/callback</code>
+                    </li>
+                    <li>
+                      Put <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_ID</code> and{' '}
+                      <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_SECRET</code> in{' '}
+                      <code className="rounded bg-muted px-1">server/.env</code>, then restart the API.
+                    </li>
+                    <li>Click Connect and sign in as talkmedx@gmail.com.</li>
+                  </ol>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

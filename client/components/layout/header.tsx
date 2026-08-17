@@ -77,7 +77,7 @@ export function Header() {
           </div>
           <div className="min-w-0">
             <p className="truncate text-xs font-medium">{user?.name || 'Admin'}</p>
-            <p className="truncate text-[10px] text-muted-foreground">{user?.role === 'staff' ? 'Staff Member' : user?.role === 'super_admin' ? 'Super Admin' : user?.role || '—'}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{user?.role === 'staff' ? 'Staff Member' : user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role || '—'}</p>
           </div>
         </div>
 

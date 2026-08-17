@@ -4,6 +4,7 @@ import {
   admissions, notifications, reports,
 } from '../controllers';
 import * as usersController from '../controllers/usersController';
+import * as googleDriveController from '../controllers/googleDriveController';
 import { authenticate, authorize } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import {
@@ -55,6 +56,7 @@ router.put(
 
 // Public batches for admission form
 router.get('/batches/public', batches.publicDropdown);
+router.get('/settings/google-drive/callback', googleDriveController.callback);
 
 // ── Protected routes ───────────────────────────────────────
 router.use(authenticate);
@@ -67,6 +69,10 @@ router.patch('/users/:id/role', usersAdmin, validate(updateRoleSchema), usersCon
 router.patch('/users/:id/active', usersAdmin, usersController.setActive);
 router.put('/users/:id', usersAdmin, validate(updateUserSchema), usersController.updateUser);
 router.delete('/users/:id', usersAdmin, usersController.deleteUser);
+
+router.get('/settings/google-drive', adminOnly, googleDriveController.status);
+router.post('/settings/google-drive/connect', adminOnly, googleDriveController.connect);
+router.post('/settings/google-drive/disconnect', adminOnly, googleDriveController.disconnect);
 
 // Dashboard — admin only
 router.get('/dashboard/summary', adminOnly, dashboard.summary);

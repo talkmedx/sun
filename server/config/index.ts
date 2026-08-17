@@ -30,6 +30,18 @@ export const config = {
     dir: process.env.UPLOAD_DIR || 'uploads',
   },
 
+  googleDrive: {
+    clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
+    redirectUri:
+      process.env.GOOGLE_DRIVE_REDIRECT_URI ||
+      'http://localhost:5001/api/v1/settings/google-drive/callback',
+    refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '',
+    serviceAccountFile: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE || '',
+    rootFolder: process.env.GOOGLE_DRIVE_ROOT_FOLDER || "komal's Makeover",
+    accountEmail: process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL || 'talkmedx@gmail.com',
+  },
+
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     max: parseInt(process.env.RATE_LIMIT_MAX || '2000', 10),

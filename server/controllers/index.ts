@@ -11,6 +11,7 @@ import * as notificationService from '../services/notificationService';
 import * as reportService from '../services/reportService';
 import { success, created } from '../utils/response';
 import { publicUploadPath } from '../middleware/upload';
+import { archiveUploads, personDisplayName } from '../services/googleDriveService';
 
 // ── Dashboard ──────────────────────────────────────────────
 export const dashboard = {
@@ -80,8 +81,15 @@ export const students = {
   photo: async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) return success(res, null, 'No file', 400);
+      const student = await studentService.getStudent(Number(req.params.id));
       const url = publicUploadPath('profiles', req.file.filename);
-      return success(res, await studentService.updatePhoto(Number(req.params.id), url), 'Photo updated');
+      const updated = await studentService.updatePhoto(Number(req.params.id), url);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Photo' }],
+        personName: personDisplayName(student.first_name, student.last_name),
+        date: student.admission_date || new Date(),
+      });
+      return success(res, updated, 'Photo updated');
     } catch (e) { next(e); }
   },
   fees: async (req: Request, res: Response, next: NextFunction) => {
@@ -92,13 +100,27 @@ export const students = {
   addFee: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const screenshot = req.file ? publicUploadPath('payments', req.file.filename) : undefined;
-      return created(res, await studentService.addFee(Number(req.params.id), req.body, req.user!.userId, screenshot));
+      const student = await studentService.getStudent(Number(req.params.id));
+      const createdFee = await studentService.addFee(Number(req.params.id), req.body, req.user!.userId, screenshot);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Fee Payment' }],
+        personName: personDisplayName(student.first_name, student.last_name),
+        date: String(req.body.payment_date || new Date()),
+      });
+      return created(res, createdFee);
     } catch (e) { next(e); }
   },
   updateFee: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const screenshot = req.file ? publicUploadPath('payments', req.file.filename) : undefined;
-      return success(res, await studentService.updateFee(Number(req.params.id), Number(req.params.feeId), req.body, screenshot));
+      const student = await studentService.getStudent(Number(req.params.id));
+      const updated = await studentService.updateFee(Number(req.params.id), Number(req.params.feeId), req.body, screenshot);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Fee Payment' }],
+        personName: personDisplayName(student.first_name, student.last_name),
+        date: String(req.body.payment_date || new Date()),
+      });
+      return success(res, updated);
     } catch (e) { next(e); }
   },
   deleteFee: async (req: Request, res: Response, next: NextFunction) => {
@@ -136,18 +158,22 @@ export const students = {
   addDocument: async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) return success(res, null, 'No file', 400);
+      const student = await studentService.getStudent(Number(req.params.id));
       const url = publicUploadPath('documents', req.file.filename);
-      return created(
-        res,
-        await studentService.addDocument(
-          Number(req.params.id),
-          req.body.title || req.file.originalname,
-          url,
-          req.file.mimetype,
-          req.file.size,
-          req.user!.userId
-        )
+      const createdDoc = await studentService.addDocument(
+        Number(req.params.id),
+        req.body.title || req.file.originalname,
+        url,
+        req.file.mimetype,
+        req.file.size,
+        req.user!.userId
       );
+      archiveUploads({
+        files: [{ file: req.file, label: req.body.title || 'Document' }],
+        personName: personDisplayName(student.first_name, student.last_name),
+        date: student.admission_date || new Date(),
+      });
+      return created(res, createdDoc);
     } catch (e) { next(e); }
   },
   updateDocument: async (req: Request, res: Response, next: NextFunction) => {
@@ -156,18 +182,21 @@ export const students = {
       if (req.file) {
         url = publicUploadPath('documents', req.file.filename);
       }
-      return success(
-        res,
-        await studentService.updateDocument(
-          Number(req.params.id),
-          Number(req.params.docId),
-          req.body.title,
-          url,
-          req.file?.mimetype,
-          req.file?.size
-        ),
-        'Document updated'
+      const student = await studentService.getStudent(Number(req.params.id));
+      const updated = await studentService.updateDocument(
+        Number(req.params.id),
+        Number(req.params.docId),
+        req.body.title,
+        url,
+        req.file?.mimetype,
+        req.file?.size
       );
+      archiveUploads({
+        files: [{ file: req.file, label: req.body.title || 'Document' }],
+        personName: personDisplayName(student.first_name, student.last_name),
+        date: student.admission_date || new Date(),
+      });
+      return success(res, updated, 'Document updated');
     } catch (e) { next(e); }
   },
   deleteDocument: async (req: Request, res: Response, next: NextFunction) => {
@@ -292,14 +321,26 @@ export const expenses = {
   create: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const screenshot = req.file ? publicUploadPath('expenses', req.file.filename) : undefined;
-      return created(res, await expenseService.createExpense(req.body, req.user!.userId, screenshot));
+      const createdExpense = await expenseService.createExpense(req.body, req.user!.userId, screenshot);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Expense Proof' }],
+        personName: personDisplayName(String(req.body.title || 'Expense')),
+        date: String(req.body.expense_date || new Date()),
+      });
+      return created(res, createdExpense);
     } catch (e) { next(e); }
   },
   update: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const screenshot = req.file ? publicUploadPath('expenses', req.file.filename) : undefined;
       const data = screenshot ? { ...req.body, screenshot_url: screenshot } : req.body;
-      return success(res, await expenseService.updateExpense(Number(req.params.id), data), 'Updated');
+      const updated = await expenseService.updateExpense(Number(req.params.id), data);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Expense Proof' }],
+        personName: personDisplayName(String(req.body.title || updated?.title || 'Expense')),
+        date: String(req.body.expense_date || updated?.expense_date || new Date()),
+      });
+      return success(res, updated, 'Updated');
     } catch (e) { next(e); }
   },
   remove: async (req: Request, res: Response, next: NextFunction) => {
@@ -312,7 +353,14 @@ export const expenses = {
     try {
       if (!req.file) return success(res, null, 'No file', 400);
       const url = publicUploadPath('expenses', req.file.filename);
-      return success(res, await expenseService.updateScreenshot(Number(req.params.id), url));
+      const expense = await expenseService.getExpense(Number(req.params.id));
+      const updated = await expenseService.updateScreenshot(Number(req.params.id), url);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Expense Proof' }],
+        personName: personDisplayName(expense.title || 'Expense'),
+        date: expense.expense_date || new Date(),
+      });
+      return success(res, updated);
     } catch (e) { next(e); }
   },
 };
@@ -358,7 +406,14 @@ export const vendors = {
   addCredit: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const bill = req.file ? publicUploadPath('bills', req.file.filename) : undefined;
-      return created(res, await vendorService.addCredit(Number(req.params.id), req.body, req.user!.userId, bill));
+      const vendor = await vendorService.getVendor(Number(req.params.id));
+      const createdCredit = await vendorService.addCredit(Number(req.params.id), req.body, req.user!.userId, bill);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Vendor Bill' }],
+        personName: personDisplayName(vendor.name),
+        date: String(req.body.transaction_date || new Date()),
+      });
+      return created(res, createdCredit);
     } catch (e) { next(e); }
   },
   deleteCredit: async (req: Request, res: Response, next: NextFunction) => {
@@ -370,7 +425,14 @@ export const vendors = {
   updateCredit: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const bill = req.file ? publicUploadPath('bills', req.file.filename) : undefined;
-      return success(res, await vendorService.updateCredit(Number(req.params.id), Number(req.params.creditId), req.body, bill));
+      const vendor = await vendorService.getVendor(Number(req.params.id));
+      const updated = await vendorService.updateCredit(Number(req.params.id), Number(req.params.creditId), req.body, bill);
+      archiveUploads({
+        files: [{ file: req.file, label: 'Vendor Bill' }],
+        personName: personDisplayName(vendor.name),
+        date: String(req.body.transaction_date || new Date()),
+      });
+      return success(res, updated);
     } catch (e) { next(e); }
   },
   expenses: async (req: Request, res: Response, next: NextFunction) => {
@@ -454,8 +516,10 @@ export const admissions = {
   submit: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-      const photo = files?.photo?.[0] ? publicUploadPath('admissions', files.photo[0].filename) : undefined;
-      const legacyProof = files?.proof?.[0] ? publicUploadPath('admissions', files.proof[0].filename) : undefined;
+      const photoFile = files?.photo?.[0];
+      const legacyProofFile = files?.proof?.[0];
+      const photo = photoFile ? publicUploadPath('admissions', photoFile.filename) : undefined;
+      const legacyProof = legacyProofFile ? publicUploadPath('admissions', legacyProofFile.filename) : undefined;
       const proofFiles = files?.proofs || [];
       const titles = req.body.proof_titles;
       const titleArr = Array.isArray(titles) ? titles : titles ? [titles] : [];
@@ -465,11 +529,17 @@ export const admissions = {
         fileType: f.mimetype,
         fileSize: f.size,
       }));
-      return created(
-        res,
-        await admissionService.submitAdmission(req.body, photo, legacyProof, proofDocuments),
-        'Application submitted'
-      );
+      const createdAdmission = await admissionService.submitAdmission(req.body, photo, legacyProof, proofDocuments);
+      archiveUploads({
+        files: [
+          { file: photoFile, label: 'Photo' },
+          { file: legacyProofFile, label: 'Proof' },
+          ...proofFiles.map((f, i) => ({ file: f, label: titleArr[i] || 'Proof' })),
+        ],
+        personName: personDisplayName(String(req.body.first_name || ''), String(req.body.last_name || '')),
+        date: String(req.body.admission_date || new Date()),
+      });
+      return created(res, createdAdmission, 'Application submitted');
     } catch (e) { next(e); }
   },
   approve: async (req: Request, res: Response, next: NextFunction) => {
@@ -495,8 +565,10 @@ export const admissions = {
   updateByToken: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-      const photo = files?.photo?.[0] ? publicUploadPath('admissions', files.photo[0].filename) : undefined;
-      const legacyProof = files?.proof?.[0] ? publicUploadPath('admissions', files.proof[0].filename) : undefined;
+      const photoFile = files?.photo?.[0];
+      const legacyProofFile = files?.proof?.[0];
+      const photo = photoFile ? publicUploadPath('admissions', photoFile.filename) : undefined;
+      const legacyProof = legacyProofFile ? publicUploadPath('admissions', legacyProofFile.filename) : undefined;
       const proofFiles = files?.proofs || [];
       const titles = req.body.proof_titles;
       const titleArr = Array.isArray(titles) ? titles : titles ? [titles] : [];
@@ -506,11 +578,17 @@ export const admissions = {
         fileType: f.mimetype,
         fileSize: f.size,
       }));
-      return success(
-        res,
-        await admissionService.updateByEditToken(String(req.params.token), req.body, photo, legacyProof, proofDocuments),
-        'Updated'
-      );
+      const updated = await admissionService.updateByEditToken(String(req.params.token), req.body, photo, legacyProof, proofDocuments);
+      archiveUploads({
+        files: [
+          { file: photoFile, label: 'Photo' },
+          { file: legacyProofFile, label: 'Proof' },
+          ...proofFiles.map((f, i) => ({ file: f, label: titleArr[i] || 'Proof' })),
+        ],
+        personName: personDisplayName(String(req.body.first_name || updated.first_name || ''), String(req.body.last_name || updated.last_name || '')),
+        date: String(req.body.admission_date || updated.admission_date || new Date()),
+      });
+      return success(res, updated, 'Updated');
     } catch (e) { next(e); }
   },
 };

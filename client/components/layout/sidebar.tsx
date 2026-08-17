@@ -67,7 +67,7 @@ export function Sidebar() {
           <div className={cn('min-w-0 flex-1', !sidebarOpen && 'md:hidden')}>
             <p className="truncate font-display text-sm font-semibold tracking-tight">Komal&apos;s Makeovers</p>
             <p className="truncate text-[11px] text-muted-foreground">
-              {role === 'staff' ? 'Staff Member' : 'Management Tool'}
+              {role === 'staff' ? 'Staff Member' : role === 'admin' ? 'Admin' : 'Management Tool'}
             </p>
           </div>
           <button

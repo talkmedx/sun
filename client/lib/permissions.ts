@@ -1,5 +1,6 @@
 export const CLIENT_ROLES = {
   SUPER_ADMIN: 'super_admin',
+  ADMIN: 'admin',
   STAFF: 'staff',
 } as const;
 
@@ -24,11 +25,16 @@ export const ROLE_NAV: Record<string, NavItemKey[]> = {
     'products', 'admissions', 'reports', 'roles', 'notifications', 'settings',
   ],
   staff: ['students', 'products', 'expenses', 'admissions', 'notifications', 'settings'],
-  // leftover DB role — same business access as before, not offered in the UI
   admin: [
     'dashboard', 'students', 'batches', 'courses', 'expenses', 'vendors',
     'products', 'admissions', 'reports', 'notifications', 'settings',
   ],
+};
+
+export const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  staff: 'Staff Member',
 };
 
 export const ROLE_DESCRIPTIONS = [
@@ -38,11 +44,21 @@ export const ROLE_DESCRIPTIONS = [
     description: 'Full access including Roles management and all modules.',
   },
   {
+    key: 'admin',
+    label: 'Admin',
+    description: 'All modules except Roles management.',
+  },
+  {
     key: 'staff',
     label: 'Staff Member',
     description: 'Limited to Students, Products, Expenses, and Admissions only.',
   },
 ];
+
+export function roleLabel(role: string | undefined | null): string {
+  if (!role) return '—';
+  return ROLE_LABELS[role] || role;
+}
 
 export function canAccessPath(role: string | undefined | null, pathname: string): boolean {
   if (!role) return false;
@@ -84,7 +100,7 @@ export function homeForRole(role: string | undefined | null): string {
 }
 
 export function isAdmin(role: string | undefined | null): boolean {
-  return role === CLIENT_ROLES.SUPER_ADMIN;
+  return role === CLIENT_ROLES.SUPER_ADMIN || role === CLIENT_ROLES.ADMIN;
 }
 
 export function isSuperAdmin(role: string | undefined | null): boolean {

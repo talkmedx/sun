@@ -16,6 +16,11 @@ coverage/
 .env.local
 .env.*.local
 
+# Google credentials
+**/google-drive-service-account.json
+**/*credentials*.json
+**/token.json
+
 # system / logs
 .DS_Store
 *.log

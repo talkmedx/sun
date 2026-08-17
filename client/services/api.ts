@@ -180,3 +180,18 @@ export const usersApi = {
   }) => api.put(`/users/${id}`, data),
   deleteUser: (id: number) => api.delete(`/users/${id}`),
 };
+
+export const settingsApi = {
+  googleDriveStatus: () =>
+    api.get<ApiResponse<{
+      appConfigured: boolean;
+      connected: boolean;
+      email: string | null;
+      expectedEmail: string;
+      rootFolder: string;
+      folderPattern: string;
+      usingServiceAccount: boolean;
+    }>>('/settings/google-drive'),
+  googleDriveConnect: () => api.post<ApiResponse<{ authUrl: string }>>('/settings/google-drive/connect'),
+  googleDriveDisconnect: () => api.post('/settings/google-drive/disconnect'),
+};

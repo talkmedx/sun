@@ -3,6 +3,7 @@ import { config } from './config';
 import { testConnection } from './config/database';
 import { ensureDefaultAdmin } from './services/authService';
 import { ensureDefaultStaff } from './services/usersService';
+import { logDriveStatus } from './services/googleDriveService';
 
 async function bootstrap() {
   const dbOk = await testConnection();
@@ -17,6 +18,7 @@ async function bootstrap() {
       await ensureDefaultStaff();
       console.log('✅ Default admin ready (admin@komalsmakeovers.com / Admin@123)');
       console.log('✅ Default staff ready (staff@komalsmakeovers.com / Staff@123)');
+      await logDriveStatus();
     } catch (err) {
       console.warn('⚠️  Could not ensure default users:', (err as Error).message);
     }
