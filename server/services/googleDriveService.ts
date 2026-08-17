@@ -14,26 +14,63 @@ const DRIVE_SCOPE = [
 const SETTING_REFRESH = 'google_drive_refresh_token';
 const SETTING_EMAIL = 'google_drive_email';
 const SETTING_OAUTH_STATE = 'google_drive_oauth_state';
+const SETTING_CLIENT_ID = 'google_drive_client_id';
+const SETTING_CLIENT_SECRET = 'google_drive_client_secret';
+const SETTING_REDIRECT = 'google_drive_oauth_redirect';
 
 const folderCache = new Map<string, string>();
 let cachedRefreshToken: string | null | undefined;
 let cachedEmail: string | null | undefined;
+let cachedClientId: string | null | undefined;
+let cachedClientSecret: string | null | undefined;
 
 export type DriveUploadItem = {
   file: Express.Multer.File;
   label?: string;
 };
 
-function oauthClient(): OAuth2Client {
+export function resolvePublicUrls(hostHeader?: string) {
+  const host = (hostHeader || '').split(':')[0].trim();
+  const isLive = host.includes('vanityvow.com');
+  const clientUrl = isLive
+    ? `https://${host}`
+    : (process.env.CLIENT_URL && !process.env.CLIENT_URL.includes('localhost')
+      ? process.env.CLIENT_URL
+      : config.clientUrl);
+  const redirectUri = isLive
+    ? `https://${host}/api/v1/settings/google-drive/callback`
+    : (process.env.GOOGLE_DRIVE_REDIRECT_URI || config.googleDrive.redirectUri);
+  return { clientUrl, redirectUri };
+}
+
+async function getClientId(): Promise<string> {
+  if (config.googleDrive.clientId) return config.googleDrive.clientId;
+  if (cachedClientId !== undefined) return cachedClientId || '';
+  cachedClientId = await getSetting(SETTING_CLIENT_ID);
+  return cachedClientId || '';
+}
+
+async function getClientSecret(): Promise<string> {
+  if (config.googleDrive.clientSecret) return config.googleDrive.clientSecret;
+  if (cachedClientSecret !== undefined) return cachedClientSecret || '';
+  cachedClientSecret = await getSetting(SETTING_CLIENT_SECRET);
+  return cachedClientSecret || '';
+}
+
+async function oauthClient(redirectUri?: string): Promise<OAuth2Client> {
+  const clientId = await getClientId();
+  const clientSecret = await getClientSecret();
   return new google.auth.OAuth2(
-    config.googleDrive.clientId,
-    config.googleDrive.clientSecret,
-    config.googleDrive.redirectUri
+    clientId,
+    clientSecret,
+    redirectUri || config.googleDrive.redirectUri
   );
 }
 
-export function hasOAuthAppCredentials(): boolean {
-  return Boolean(config.googleDrive.clientId && config.googleDrive.clientSecret);
+export async function hasOAuthAppCredentials(): Promise<boolean> {
+  const id = await getClientId();
+  const secret = await getClientSecret();
+  return Boolean(id && secret);
 }
 
 export function hasServiceAccount(): boolean {
@@ -81,7 +118,7 @@ async function getStoredEmail(): Promise<string | null> {
 
 export async function isDriveReady(): Promise<boolean> {
   if (hasServiceAccount()) return true;
-  if (!hasOAuthAppCredentials()) return false;
+  if (!(await hasOAuthAppCredentials())) return false;
   return Boolean(await getStoredRefreshToken());
 }
 
@@ -94,11 +131,11 @@ async function getAuthClient() {
   }
 
   const refreshToken = await getStoredRefreshToken();
-  if (!hasOAuthAppCredentials() || !refreshToken) {
+  if (!(await hasOAuthAppCredentials()) || !refreshToken) {
     return null;
   }
 
-  const client = oauthClient();
+  const client = await oauthClient();
   client.setCredentials({ refresh_token: refreshToken });
   return client;
 }
@@ -267,57 +304,72 @@ export function archiveUploads(opts: {
   });
 }
 
-export async function getDriveStatus() {
+export async function getDriveStatus(hostHeader?: string) {
   const ready = await isDriveReady();
   const email = (await getStoredEmail()) || (ready ? config.googleDrive.accountEmail : null);
+  const { redirectUri } = resolvePublicUrls(hostHeader);
+  const clientId = await getClientId();
   return {
-    appConfigured: hasOAuthAppCredentials() || hasServiceAccount(),
+    appConfigured: (await hasOAuthAppCredentials()) || hasServiceAccount(),
     connected: ready,
     email,
     expectedEmail: config.googleDrive.accountEmail,
     rootFolder: config.googleDrive.rootFolder,
     folderPattern: '{student name} {DD-MM-YYYY}',
-    redirectUri: config.googleDrive.redirectUri,
+    redirectUri,
+    clientId: clientId || '',
     usingServiceAccount: hasServiceAccount(),
   };
 }
 
-export function createConnectUrl(state: string): string {
-  const client = oauthClient();
-  return client.generateAuthUrl({
-    access_type: 'offline',
-    prompt: 'consent',
-    scope: DRIVE_SCOPE,
-    state,
-    include_granted_scopes: true,
-  });
+export async function saveAppCredentials(clientId: string, clientSecret: string) {
+  const id = clientId.trim();
+  const secret = clientSecret.trim();
+  if (!id || !secret) {
+    throw new Error('Client ID and Client secret are required');
+  }
+  cachedClientId = id;
+  cachedClientSecret = secret;
+  await upsertSetting(SETTING_CLIENT_ID, id, 'Google Drive OAuth client ID');
+  await upsertSetting(SETTING_CLIENT_SECRET, secret, 'Google Drive OAuth client secret');
 }
 
-export async function startConnect(): Promise<{ authUrl: string }> {
-  if (!hasOAuthAppCredentials()) {
-    throw new Error(
-      'Google Drive is not configured. Add GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET to server/.env'
-    );
+export async function startConnect(hostHeader?: string): Promise<{ authUrl: string }> {
+  if (!(await hasOAuthAppCredentials())) {
+    throw new Error('Save Google Client ID and Client secret first, then click Connect.');
   }
+  const { redirectUri } = resolvePublicUrls(hostHeader);
   const state = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
   await upsertSetting(SETTING_OAUTH_STATE, state, 'Google Drive OAuth CSRF state');
-  return { authUrl: createConnectUrl(state) };
+  await upsertSetting(SETTING_REDIRECT, redirectUri, 'Google Drive OAuth redirect URI');
+  const client = await oauthClient(redirectUri);
+  return {
+    authUrl: client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: DRIVE_SCOPE,
+      state,
+      include_granted_scopes: true,
+    }),
+  };
 }
 
-export async function handleOAuthCallback(code: string, state: string): Promise<string> {
+export async function handleOAuthCallback(code: string, state: string, hostHeader?: string): Promise<string> {
   const expected = await getSetting(SETTING_OAUTH_STATE);
   if (!expected || expected !== state) {
     throw new Error('Invalid Google Drive OAuth state');
   }
 
-  const client = oauthClient();
+  const storedRedirect = await getSetting(SETTING_REDIRECT);
+  const { clientUrl, redirectUri } = resolvePublicUrls(hostHeader);
+  const client = await oauthClient(storedRedirect || redirectUri);
   const { tokens } = await client.getToken(code);
   await persistTokens(client, tokens);
   await clearSetting(SETTING_OAUTH_STATE);
   folderCache.clear();
 
   const email = cachedEmail || config.googleDrive.accountEmail;
-  return `${config.clientUrl}/sun/settings?drive=connected&email=${encodeURIComponent(email || '')}`;
+  return `${clientUrl}/sun/settings?drive=connected&email=${encodeURIComponent(email || '')}`;
 }
 
 async function persistTokens(client: OAuth2Client, tokens: Credentials) {

@@ -71,6 +71,7 @@ router.put('/users/:id', usersAdmin, validate(updateUserSchema), usersController
 router.delete('/users/:id', usersAdmin, usersController.deleteUser);
 
 router.get('/settings/google-drive', adminOnly, googleDriveController.status);
+router.post('/settings/google-drive/credentials', adminOnly, googleDriveController.saveCredentials);
 router.post('/settings/google-drive/connect', adminOnly, googleDriveController.connect);
 router.post('/settings/google-drive/disconnect', adminOnly, googleDriveController.disconnect);
 

@@ -18,6 +18,8 @@ export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
   const [connecting, setConnecting] = useState(false);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
   const canManageDrive = isAdmin(user?.role);
 
   const passwordForm = useForm({
@@ -31,6 +33,10 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
+    if (driveQuery.data?.clientId) setClientId(driveQuery.data.clientId);
+  }, [driveQuery.data?.clientId]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('drive') === 'connected') {
       const email = params.get('email');
@@ -42,6 +48,16 @@ export default function SettingsPage() {
       window.history.replaceState({}, '', '/sun/settings');
     }
   }, [qc]);
+
+  const saveCredentials = useMutation({
+    mutationFn: () => settingsApi.googleDriveSaveCredentials(clientId, clientSecret),
+    onSuccess: () => {
+      toast.success('Google credentials saved. Click Connect Google Drive.');
+      setClientSecret('');
+      qc.invalidateQueries({ queryKey: ['google-drive-status'] });
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
 
   const disconnectDrive = useMutation({
     mutationFn: () => settingsApi.googleDriveDisconnect(),
@@ -248,24 +264,45 @@ export default function SettingsPage() {
                   )}
                 </div>
 
+                {!driveQuery.data?.connected && (
+                  <div className="space-y-3 rounded-xl border border-border/50 p-4">
+                    <p className="text-sm font-medium">Google Cloud credentials</p>
+                    <div className="space-y-1.5">
+                      <Label>Client ID</Label>
+                      <Input
+                        value={clientId}
+                        onChange={(e) => setClientId(e.target.value)}
+                        placeholder="xxxxx.apps.googleusercontent.com"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Client secret</Label>
+                      <Input
+                        type="password"
+                        value={clientSecret}
+                        onChange={(e) => setClientSecret(e.target.value)}
+                        placeholder="GOCSPX-..."
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => saveCredentials.mutate()}
+                      disabled={saveCredentials.isPending || !clientId.trim() || !clientSecret.trim()}
+                    >
+                      {saveCredentials.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+                      Save credentials
+                    </Button>
+                  </div>
+                )}
+
                 {!driveQuery.data?.appConfigured && (
-                  <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
-                    <li>Open Google Cloud Console and create (or pick) a project.</li>
-                    <li>Enable the Google Drive API.</li>
-                    <li>Create an OAuth client of type Web application.</li>
-                    <li>
-                      Add redirect URI{' '}
-                      <code className="rounded bg-muted px-1">
-                        {driveQuery.data?.redirectUri || 'https://vanityvow.com/api/v1/settings/google-drive/callback'}
-                      </code>
-                    </li>
-                    <li>
-                      Put <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_ID</code> and{' '}
-                      <code className="rounded bg-muted px-1">GOOGLE_DRIVE_CLIENT_SECRET</code> in the live{' '}
-                      <code className="rounded bg-muted px-1">server/.env</code>, then restart the API.
-                    </li>
-                    <li>Click Connect and sign in as talkmedx@gmail.com.</li>
-                  </ol>
+                  <p className="text-xs text-muted-foreground">
+                    Paste the live Client ID and secret above, save, then click Connect. Redirect URI must be{' '}
+                    <code className="rounded bg-muted px-1">
+                      {driveQuery.data?.redirectUri || 'https://vanityvow.com/api/v1/settings/google-drive/callback'}
+                    </code>
+                  </p>
                 )}
               </>
             )}
