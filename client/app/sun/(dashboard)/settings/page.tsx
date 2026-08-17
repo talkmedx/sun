@@ -14,11 +14,23 @@ import { useAuthStore } from '@/store';
 import { getErrorMessage } from '@/lib/api';
 import { isAdmin } from '@/lib/permissions';
 
+const PRODUCTION_DRIVE_CLIENT_ID =
+  '337775424400-ftfnkebn5hnaqgn5nvspggjb6ccbnigp.apps.googleusercontent.com';
+
+function resolveClientId(raw: string) {
+  const value = raw.trim();
+  if (value.includes('apps.googleusercontent.com')) return value;
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vanityvow.com')) {
+    return PRODUCTION_DRIVE_CLIENT_ID;
+  }
+  return value;
+}
+
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
   const [connecting, setConnecting] = useState(false);
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(PRODUCTION_DRIVE_CLIENT_ID);
   const [clientSecret, setClientSecret] = useState('');
   const canManageDrive = isAdmin(user?.role);
 
@@ -61,14 +73,14 @@ export default function SettingsPage() {
   });
 
   async function connectDrive() {
-    const id = clientId.trim();
+    const id = resolveClientId(clientId);
     const secret = clientSecret.trim();
     if (!id.includes('apps.googleusercontent.com')) {
-      toast.error('Client ID must be the Google client ID, not an email. It ends with .apps.googleusercontent.com');
+      toast.error('Paste the Google Client ID. It ends with .apps.googleusercontent.com');
       return;
     }
     if (!secret) {
-      toast.error('Enter the Google Client secret');
+      toast.error('Paste the Google Client secret (starts with GOCSPX-)');
       return;
     }
     try {
@@ -271,8 +283,7 @@ export default function SettingsPage() {
                   <div className="space-y-3 rounded-xl border border-border/50 p-4">
                     <p className="text-sm font-medium">Google Cloud credentials</p>
                     <p className="text-xs text-muted-foreground">
-                      Use the Client ID that ends with <code className="rounded bg-muted px-1">.apps.googleusercontent.com</code>
-                      — not your login email. Then click Connect Google Drive. No Google sign-in screen.
+                      Client ID is already filled. Paste only the Client secret, then click Connect Google Drive.
                     </p>
                     <div className="hidden" aria-hidden="true">
                       <input type="text" name="username" autoComplete="username" />
@@ -281,24 +292,29 @@ export default function SettingsPage() {
                     <div className="space-y-1.5">
                       <Label>Client ID</Label>
                       <Input
-                        name="google-client-id"
+                        name="google-drive-client-id"
                         autoComplete="off"
+                        spellCheck={false}
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
-                        placeholder="337775424400-xxxx.apps.googleusercontent.com"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Client secret</Label>
                       <Input
                         type="text"
-                        name="google-client-secret"
-                        autoComplete="new-password"
+                        name="google-drive-client-secret"
+                        autoComplete="off"
+                        spellCheck={false}
                         value={clientSecret}
                         onChange={(e) => setClientSecret(e.target.value)}
                         placeholder="GOCSPX-..."
                       />
                     </div>
+                    <Button className="w-full sm:w-auto" onClick={connectDrive} disabled={connecting}>
+                      {connecting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+                      Connect Google Drive
+                    </Button>
                   </div>
                 )}
               </>
