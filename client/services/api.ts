@@ -194,7 +194,8 @@ export const settingsApi = {
       clientId: string;
       usingServiceAccount: boolean;
     }>>('/settings/google-drive'),
-  googleDriveConnect: () => api.post<ApiResponse<{ authUrl: string }>>('/settings/google-drive/connect'),
+  googleDriveConnect: (data: { clientId: string; clientSecret: string; refreshToken?: string }) =>
+    api.post<ApiResponse<{ connected: boolean; email: string | null }>>('/settings/google-drive/connect', data),
   googleDriveSaveCredentials: (clientId: string, clientSecret: string) =>
     api.post('/settings/google-drive/credentials', { clientId, clientSecret }),
   googleDriveDisconnect: () => api.post('/settings/google-drive/disconnect'),

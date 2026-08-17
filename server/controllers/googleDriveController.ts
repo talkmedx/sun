@@ -34,9 +34,20 @@ export async function saveCredentials(req: Request, res: Response, next: NextFun
 
 export async function connect(req: Request, res: Response, next: NextFunction) {
   try {
-    return success(res, await googleDrive.startConnect(requestHost(req)));
+    const result = await googleDrive.connectWithCredentials({
+      clientId: String(req.body.clientId || ''),
+      clientSecret: String(req.body.clientSecret || ''),
+      refreshToken: String(req.body.refreshToken || ''),
+    });
+    if (!result.connected) {
+      throw new AppError(
+        'Client ID and secret were saved. Google still cannot access Drive with those two values alone. Paste a service account JSON key into Client secret to connect without Google sign-in.',
+        400
+      );
+    }
+    return success(res, result, 'Google Drive connected');
   } catch (e) {
-    next(e instanceof Error ? new AppError(e.message, 400) : e);
+    next(e instanceof Error ? (e instanceof AppError ? e : new AppError(e.message, 400)) : e);
   }
 }
 

@@ -33,7 +33,9 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (driveQuery.data?.clientId) setClientId(driveQuery.data.clientId);
+    if (driveQuery.data?.clientId?.includes('apps.googleusercontent.com')) {
+      setClientId(driveQuery.data.clientId);
+    }
   }, [driveQuery.data?.clientId]);
 
   useEffect(() => {
@@ -49,16 +51,6 @@ export default function SettingsPage() {
     }
   }, [qc]);
 
-  const saveCredentials = useMutation({
-    mutationFn: () => settingsApi.googleDriveSaveCredentials(clientId, clientSecret),
-    onSuccess: () => {
-      toast.success('Google credentials saved. Click Connect Google Drive.');
-      setClientSecret('');
-      qc.invalidateQueries({ queryKey: ['google-drive-status'] });
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
   const disconnectDrive = useMutation({
     mutationFn: () => settingsApi.googleDriveDisconnect(),
     onSuccess: () => {
@@ -69,15 +61,26 @@ export default function SettingsPage() {
   });
 
   async function connectDrive() {
+    const id = clientId.trim();
+    const secret = clientSecret.trim();
+    if (!id.includes('apps.googleusercontent.com')) {
+      toast.error('Client ID must be the Google client ID, not an email. It ends with .apps.googleusercontent.com');
+      return;
+    }
+    if (!secret) {
+      toast.error('Enter the Google Client secret');
+      return;
+    }
     try {
       setConnecting(true);
-      const { data } = await settingsApi.googleDriveConnect();
-      const url = data.data.authUrl;
-      if (!url) throw new Error('Missing Google authorization URL');
-      window.location.href = url;
+      const { data } = await settingsApi.googleDriveConnect({ clientId: id, clientSecret: secret });
+      toast.success(data.data.email ? `Google Drive connected as ${data.data.email}` : 'Google Drive connected');
+      setClientSecret('');
+      qc.invalidateQueries({ queryKey: ['google-drive-status'] });
     } catch (e) {
-      setConnecting(false);
       toast.error(getErrorMessage(e));
+    } finally {
+      setConnecting(false);
     }
   }
 
@@ -257,7 +260,7 @@ export default function SettingsPage() {
                       Disconnect
                     </Button>
                   ) : (
-                    <Button onClick={connectDrive} disabled={connecting || !driveQuery.data?.appConfigured}>
+                    <Button onClick={connectDrive} disabled={connecting}>
                       {connecting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
                       Connect Google Drive
                     </Button>
@@ -267,42 +270,36 @@ export default function SettingsPage() {
                 {!driveQuery.data?.connected && (
                   <div className="space-y-3 rounded-xl border border-border/50 p-4">
                     <p className="text-sm font-medium">Google Cloud credentials</p>
+                    <p className="text-xs text-muted-foreground">
+                      Use the Client ID that ends with <code className="rounded bg-muted px-1">.apps.googleusercontent.com</code>
+                      — not your login email. Then click Connect Google Drive. No Google sign-in screen.
+                    </p>
+                    <div className="hidden" aria-hidden="true">
+                      <input type="text" name="username" autoComplete="username" />
+                      <input type="password" name="password" autoComplete="current-password" />
+                    </div>
                     <div className="space-y-1.5">
                       <Label>Client ID</Label>
                       <Input
+                        name="google-client-id"
+                        autoComplete="off"
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
-                        placeholder="xxxxx.apps.googleusercontent.com"
+                        placeholder="337775424400-xxxx.apps.googleusercontent.com"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Client secret</Label>
                       <Input
-                        type="password"
+                        type="text"
+                        name="google-client-secret"
+                        autoComplete="new-password"
                         value={clientSecret}
                         onChange={(e) => setClientSecret(e.target.value)}
                         placeholder="GOCSPX-..."
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => saveCredentials.mutate()}
-                      disabled={saveCredentials.isPending || !clientId.trim() || !clientSecret.trim()}
-                    >
-                      {saveCredentials.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-                      Save credentials
-                    </Button>
                   </div>
-                )}
-
-                {!driveQuery.data?.appConfigured && (
-                  <p className="text-xs text-muted-foreground">
-                    Paste the live Client ID and secret above, save, then click Connect. Redirect URI must be{' '}
-                    <code className="rounded bg-muted px-1">
-                      {driveQuery.data?.redirectUri || 'https://vanityvow.com/api/v1/settings/google-drive/callback'}
-                    </code>
-                  </p>
                 )}
               </>
             )}
