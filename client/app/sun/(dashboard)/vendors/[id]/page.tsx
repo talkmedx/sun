@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
+import { resolveUploadUrl } from '@/lib/uploads';
 import { useAuthStore } from '@/store';
 import { Product } from '@/types';
 
@@ -583,7 +584,7 @@ export default function VendorDetailPage() {
                       </span>
                       {Boolean(c.bill_url) && (
                         <a
-                          href={`http://localhost:5001${c.bill_url}`}
+                          href={resolveUploadUrl(c.bill_url)}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center text-[10px] text-primary hover:underline font-medium"
@@ -657,7 +658,7 @@ export default function VendorDetailPage() {
                       <td className="py-2">
                         {Boolean(c.bill_url) ? (
                           <a
-                            href={`http://localhost:5001${c.bill_url}`}
+                            href={resolveUploadUrl(c.bill_url)}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center text-xs text-primary hover:underline font-medium"

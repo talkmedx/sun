@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate, formatFullName, fullNameToRecord } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
+import { resolveUploadUrl } from '@/lib/uploads';
 import { useAuthStore } from '@/store';
 
 const DOC_TYPES = ['Aadhar Card', 'Pan Card', 'Driving License', 'Voting Card', 'Rent Agreement', 'Other'];
@@ -884,7 +885,7 @@ export default function StudentProfilePage() {
                 <div className="h-24 w-24 overflow-hidden rounded-2xl bg-card border-4 border-card shadow-lg flex items-center justify-center">
                   {student.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={`http://localhost:5001${student.photo_url}`} alt="" className="h-full w-full object-cover" />
+                    <img src={resolveUploadUrl(student.photo_url)} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-primary bg-primary/10">
                       {student.first_name.charAt(0)}
@@ -1159,7 +1160,7 @@ export default function StudentProfilePage() {
                         {f.screenshot_url && (
                           <div className="pt-0.5">
                             <a
-                              href={f.screenshot_url.startsWith('http') ? f.screenshot_url : `http://localhost:5001${f.screenshot_url}`}
+                              href={resolveUploadUrl(f.screenshot_url)}
                               target="_blank"
                               rel="noreferrer"
                               className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold"
@@ -1223,7 +1224,7 @@ export default function StudentProfilePage() {
                             <td className="px-4 py-3.5">
                               {f.screenshot_url ? (
                                 <a
-                                  href={f.screenshot_url.startsWith('http') ? f.screenshot_url : `http://localhost:5001${f.screenshot_url}`}
+                                  href={resolveUploadUrl(f.screenshot_url)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="text-xs text-primary hover:underline inline-flex items-center gap-1 font-semibold"
@@ -1596,7 +1597,7 @@ export default function StudentProfilePage() {
               <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {docs?.map((d: any) => {
-                  const fullUrl = d.file_url?.startsWith('http') ? d.file_url : `http://localhost:5001${d.file_url}`;
+                  const fullUrl = resolveUploadUrl(d.file_url);
                   const isImage = d.file_type?.startsWith('image/') || d.file_url?.match(/\.(jpg|jpeg|png|webp|gif)$/i);
 
                   return (

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api';
+import { resolveUploadUrl } from '@/lib/uploads';
 import { Expense } from '@/types';
 
 import { Pagination } from '@/components/ui/pagination';
@@ -348,7 +349,7 @@ export default function ExpensesPage() {
                 {editProofFile && <p className="text-xs text-emerald-600 font-medium">Selected: {editProofFile.name}</p>}
                 {editingExpense?.screenshot_url && !editProofFile && (
                   <a
-                    href={`http://localhost:5001${editingExpense.screenshot_url}`}
+                    href={resolveUploadUrl(editingExpense.screenshot_url)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-primary hover:underline inline-flex items-center mt-1"
@@ -529,7 +530,7 @@ export default function ExpensesPage() {
                         <div className="flex justify-between items-center pt-1">
                           <span>Proof</span>
                           <a
-                            href={`http://localhost:5001${e.screenshot_url}`}
+                            href={resolveUploadUrl(e.screenshot_url)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-primary hover:underline font-medium inline-flex items-center"
@@ -611,7 +612,7 @@ export default function ExpensesPage() {
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           {e.screenshot_url ? (
                             <a
-                              href={`http://localhost:5001${e.screenshot_url}`}
+                              href={resolveUploadUrl(e.screenshot_url)}
                               target="_blank"
                               rel="noreferrer"
                               className="text-primary hover:underline font-medium inline-flex items-center text-xs"

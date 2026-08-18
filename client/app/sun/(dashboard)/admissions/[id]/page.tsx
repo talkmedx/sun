@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { formatDate, formatCurrency, formatFullName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/api';
+import { resolveUploadUrl } from '@/lib/uploads';
 import {
   User, Phone, Mail, MapPin, Calendar, Layers, FileText, CheckCircle2,
   XCircle, ExternalLink, IndianRupee, ShieldCheck, ArrowLeft, AlertCircle, Loader2
@@ -273,12 +274,12 @@ export default function AdmissionDetailPage() {
                 <div className="flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`http://localhost:5001${a.photo_url}`}
+                    src={resolveUploadUrl(a.photo_url)}
                     alt="Student Photo"
                     className="h-28 w-28 rounded-xl object-cover border border-border shadow-xs"
                   />
                   <a
-                    href={`http://localhost:5001${a.photo_url}`}
+                    href={resolveUploadUrl(a.photo_url)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-primary hover:underline font-medium inline-flex items-center"
@@ -297,7 +298,7 @@ export default function AdmissionDetailPage() {
               {a.proof_url ? (
                 <div className="space-y-2">
                   <a
-                    href={`http://localhost:5001${a.proof_url}`}
+                    href={resolveUploadUrl(a.proof_url)}
                     target="_blank"
                     rel="noreferrer"
                     className="p-3 rounded-lg border border-border/70 hover:border-primary/50 bg-muted/20 flex items-center justify-between transition-colors text-xs font-medium group"

@@ -106,6 +106,7 @@ export const students = {
         files: [{ file: req.file, label: 'Fee Payment' }],
         personName: personDisplayName(student.first_name, student.last_name),
         date: String(req.body.payment_date || new Date()),
+        subfolder: 'collection fees',
       });
       return created(res, createdFee);
     } catch (e) { next(e); }
@@ -119,6 +120,7 @@ export const students = {
         files: [{ file: req.file, label: 'Fee Payment' }],
         personName: personDisplayName(student.first_name, student.last_name),
         date: String(req.body.payment_date || new Date()),
+        subfolder: 'collection fees',
       });
       return success(res, updated);
     } catch (e) { next(e); }

@@ -223,8 +223,8 @@ export function folderDate(value?: string | Date | null): string {
   return `${dd}-${mm}-${yyyy} ${hh}-${min}`;
 }
 
-export function studentFolderName(personName: string, date?: string | Date | null): string {
-  return sanitizeFolderName(`${personDisplayName(personName)} ${folderDate(date || new Date())}`);
+export function studentFolderName(personName: string, _date?: string | Date | null): string {
+  return personDisplayName(personName);
 }
 
 async function findOrCreateFolder(
@@ -269,15 +269,19 @@ async function findOrCreateFolder(
   return id;
 }
 
-async function ensureStudentDocsFolder(
+async function ensureStudentFolder(
   drive: drive_v3.Drive,
   personName: string,
-  when?: string | Date | null
-): Promise<{ folderId: string; folderName: string }> {
+  subfolder?: string
+): Promise<{ folderId: string; folderPath: string }> {
   const rootId = await findOrCreateFolder(drive, config.googleDrive.rootFolder);
-  const folderName = studentFolderName(personName, when || new Date());
-  const folderId = await findOrCreateFolder(drive, folderName, rootId);
-  return { folderId, folderName };
+  const folderName = studentFolderName(personName);
+  const studentId = await findOrCreateFolder(drive, folderName, rootId);
+  if (!subfolder) {
+    return { folderId: studentId, folderPath: `${config.googleDrive.rootFolder}/${folderName}` };
+  }
+  const subId = await findOrCreateFolder(drive, subfolder, studentId);
+  return { folderId: subId, folderPath: `${config.googleDrive.rootFolder}/${folderName}/${subfolder}` };
 }
 
 function uniqueFileName(originalName: string, label?: string): string {
@@ -314,6 +318,7 @@ export async function uploadDocuments(opts: {
   files: DriveUploadItem[];
   personName: string;
   date?: string | Date | null;
+  subfolder?: string;
 }): Promise<number> {
   const files = opts.files.filter((f) => f?.file);
   if (!files.length) return 0;
@@ -321,12 +326,12 @@ export async function uploadDocuments(opts: {
   const drive = await getDrive();
   if (!drive) {
     console.warn('[Google Drive] Not connected — queuing documents for later');
-    await enqueuePendingUploads(opts.personName, files);
+    await enqueuePendingUploads(opts.personName, files, opts.subfolder);
     return 0;
   }
 
   const personName = personDisplayName(opts.personName);
-  const { folderId, folderName } = await ensureStudentDocsFolder(drive, personName, opts.date || new Date());
+  const { folderId, folderPath } = await ensureStudentFolder(drive, personName, opts.subfolder);
 
   let uploaded = 0;
   for (const item of files) {
@@ -342,9 +347,7 @@ export async function uploadDocuments(opts: {
   }
 
   if (uploaded) {
-    console.log(
-      `[Google Drive] Archived ${uploaded} file(s) → ${config.googleDrive.rootFolder}/${folderName}`
-    );
+    console.log(`[Google Drive] Archived ${uploaded} file(s) → ${folderPath}`);
   }
   return uploaded;
 }
@@ -354,6 +357,7 @@ export function archiveUploads(opts: {
   files: Array<{ file?: Express.Multer.File; label?: string }>;
   personName: string;
   date?: string | Date | null;
+  subfolder?: string;
 }): void {
   const files: DriveUploadItem[] = opts.files
     .filter((item): item is { file: Express.Multer.File; label?: string } => Boolean(item.file))
@@ -366,7 +370,12 @@ export function archiveUploads(opts: {
       label: item.label,
     }));
   if (!files.length) return;
-  void uploadDocuments({ files, personName: opts.personName, date: opts.date }).catch((err) => {
+  void uploadDocuments({
+    files,
+    personName: opts.personName,
+    date: opts.date,
+    subfolder: opts.subfolder,
+  }).catch((err) => {
     console.error('[Google Drive] Archive failed:', (err as Error).message);
   });
 }
@@ -383,7 +392,7 @@ export async function getDriveStatus(hostHeader?: string) {
     email,
     expectedEmail: config.googleDrive.accountEmail,
     rootFolder: config.googleDrive.rootFolder,
-    folderPattern: '{full name} {DD-MM-YYYY HH-mm}',
+    folderPattern: "{student name} / collection fees",
     redirectUri,
     clientId: clientId || '',
     usingServiceAccount: hasServiceAccount(),
@@ -589,12 +598,14 @@ export async function logDriveStatus() {
 
 type PendingJob = {
   personName: string;
+  subfolder?: string;
   files: Array<{ path: string; originalname: string; mimetype?: string; label?: string }>;
 };
 
-async function enqueuePendingUploads(personName: string, files: DriveUploadItem[]) {
+async function enqueuePendingUploads(personName: string, files: DriveUploadItem[], subfolder?: string) {
   const job: PendingJob = {
     personName,
+    subfolder,
     files: files.map((item) => ({
       path: item.file.path,
       originalname: item.file.originalname,
@@ -636,7 +647,11 @@ async function flushPendingQueue() {
       .filter((file) => file.path && fs.existsSync(file.path))
       .map((file) => ({ file, label: file.label }));
     if (files.length) {
-      await uploadDocuments({ files, personName: job.personName, date: new Date() });
+      await uploadDocuments({
+        files,
+        personName: job.personName,
+        subfolder: job.subfolder,
+      });
     }
   }
 }
