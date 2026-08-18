@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Camera, Image as ImageIcon, Plus, Trash2, Upload } from 'lucide-react';
+import { Camera, Image as ImageIcon, Loader2, Plus, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import { prepareAdmissionFile } from '@/lib/upload-file';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,6 +24,20 @@ export function AdmissionProofUpload({ proofs, onChange }: Props) {
   const [selectedType, setSelectedType] = useState<AdmissionProofType | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
+  const [preparing, setPreparing] = useState(false);
+
+  async function onPickFile(file?: File) {
+    if (!file) return;
+    try {
+      setPreparing(true);
+      setPendingFile(await prepareAdmissionFile(file));
+    } catch (err) {
+      setPendingFile(null);
+      toast.error(err instanceof Error ? err.message : 'File is too large. Please upload a document smaller than 2 MB.');
+    } finally {
+      setPreparing(false);
+    }
+  }
 
   const openTypePicker = () => {
     setSelectedType(null);
@@ -59,6 +75,7 @@ export function AdmissionProofUpload({ proofs, onChange }: Props) {
           <Upload className="h-3.5 w-3.5 mr-1" /> Upload Proof
         </Button>
       </div>
+      <p className="text-[11px] text-muted-foreground">Each proof must be smaller than 2 MB.</p>
 
       {proofs.length > 0 && (
         <div className="space-y-1.5 rounded-lg border border-border/60 p-2.5 bg-muted/20">
@@ -117,6 +134,9 @@ export function AdmissionProofUpload({ proofs, onChange }: Props) {
             <DialogTitle>{selectedType || 'Upload Proof'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Files larger than 2 MB are not allowed. Photos are compressed automatically.
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-all text-center space-y-1">
                 <ImageIcon className="h-6 w-6 text-primary" />
@@ -127,9 +147,7 @@ export function AdmissionProofUpload({ proofs, onChange }: Props) {
                   type="file"
                   accept="image/*,.pdf,application/pdf"
                   className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setPendingFile(e.target.files[0]);
-                  }}
+                  onChange={(e) => onPickFile(e.target.files?.[0])}
                 />
               </label>
 
@@ -143,12 +161,16 @@ export function AdmissionProofUpload({ proofs, onChange }: Props) {
                   accept="image/*"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setPendingFile(e.target.files[0]);
-                  }}
+                  onChange={(e) => onPickFile(e.target.files?.[0])}
                 />
               </label>
             </div>
+
+            {preparing && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparing file…
+              </p>
+            )}
 
             {pendingFile && (
               <div className="p-2.5 bg-muted/40 rounded-lg text-xs flex items-center justify-between font-medium">
@@ -157,7 +179,7 @@ export function AdmissionProofUpload({ proofs, onChange }: Props) {
               </div>
             )}
 
-            <Button type="button" className="w-full" disabled={!pendingFile} onClick={addProof}>
+            <Button type="button" className="w-full" disabled={!pendingFile || preparing} onClick={addProof}>
               <Plus className="h-4 w-4 mr-1.5" /> Submit
             </Button>
           </div>

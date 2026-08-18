@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Camera, Image as ImageIcon, Trash2, Upload, User } from 'lucide-react';
+import { Camera, Image as ImageIcon, Loader2, Trash2, Upload, User } from 'lucide-react';
+import { toast } from 'sonner';
+import { prepareAdmissionFile } from '@/lib/upload-file';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,6 +17,7 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
+  const [preparing, setPreparing] = useState(false);
 
   const photoPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
   const pendingPreview = useMemo(
@@ -33,6 +36,19 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
       if (pendingPreview) URL.revokeObjectURL(pendingPreview);
     };
   }, [pendingPreview]);
+
+  async function onPickFile(file?: File) {
+    if (!file) return;
+    try {
+      setPreparing(true);
+      setPendingFile(await prepareAdmissionFile(file));
+    } catch (err) {
+      setPendingFile(null);
+      toast.error(err instanceof Error ? err.message : 'File is too large. Please upload a document smaller than 2 MB.');
+    } finally {
+      setPreparing(false);
+    }
+  }
 
   const openUpload = () => {
     setPendingFile(photo);
@@ -62,6 +78,7 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
           <Upload className="h-3.5 w-3.5 mr-1" /> Upload Photo
         </Button>
       </div>
+      <p className="text-[11px] text-muted-foreground">Each photo must be smaller than 2 MB.</p>
 
       {photo && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-2.5 bg-muted/20 text-xs">
@@ -107,7 +124,7 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Choose a photo from your device gallery or capture a new photo using the camera.
+              Choose a photo from your device or camera. Files larger than 2 MB are not allowed.
             </p>
 
             <div className="grid grid-cols-2 gap-3">
@@ -120,9 +137,7 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setPendingFile(e.target.files[0]);
-                  }}
+                  onChange={(e) => onPickFile(e.target.files?.[0])}
                 />
               </label>
 
@@ -136,12 +151,16 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
                   accept="image/*"
                   capture="user"
                   className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setPendingFile(e.target.files[0]);
-                  }}
+                  onChange={(e) => onPickFile(e.target.files?.[0])}
                 />
               </label>
             </div>
+
+            {preparing && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparing photo…
+              </p>
+            )}
 
             {pendingFile && pendingPreview && (
               <div className="space-y-2">
@@ -156,7 +175,7 @@ export function AdmissionPhotoUpload({ photo, onChange }: Props) {
               </div>
             )}
 
-            <Button type="button" className="w-full" disabled={!pendingFile} onClick={confirmPhoto}>
+            <Button type="button" className="w-full" disabled={!pendingFile || preparing} onClick={confirmPhoto}>
               Submit
             </Button>
           </div>
