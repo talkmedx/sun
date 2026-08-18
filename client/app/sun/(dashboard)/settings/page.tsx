@@ -301,10 +301,18 @@ export default function SettingsPage() {
                         OAuth consent screen → External → add test user <strong className="text-foreground">{DRIVE_ACCOUNT}</strong>
                       </li>
                       <li>
-                        Credentials → Create OAuth client → Web application. Authorized redirect URI:
+                        On the OAuth client, under <strong className="text-foreground">Authorized redirect URIs</strong>, add these exact URLs, then Save:
                         <code className="mt-1 block break-all rounded-md bg-muted px-2 py-1 text-[11px] text-foreground">
-                          {driveQuery.data?.redirectUri || 'https://vanityvow.com/api/v1/settings/google-drive/callback'}
+                          https://vanityvow.com/api/v1/settings/google-drive/callback
                         </code>
+                        <code className="mt-1 block break-all rounded-md bg-muted px-2 py-1 text-[11px] text-foreground">
+                          https://www.vanityvow.com/api/v1/settings/google-drive/callback
+                        </code>
+                      </li>
+                      <li>
+                        Authorized JavaScript origins:
+                        <code className="mt-1 block break-all rounded-md bg-muted px-2 py-1 text-[11px] text-foreground">https://vanityvow.com</code>
+                        <code className="mt-1 block break-all rounded-md bg-muted px-2 py-1 text-[11px] text-foreground">https://www.vanityvow.com</code>
                       </li>
                       <li>Paste the new Client ID and Client secret below, then Connect. Allow access as {DRIVE_ACCOUNT}.</li>
                     </ol>

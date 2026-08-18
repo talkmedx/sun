@@ -30,18 +30,25 @@ export type DriveUploadItem = {
   label?: string;
 };
 
+const LIVE_CLIENT_URL = 'https://vanityvow.com';
+const LIVE_REDIRECT_URI = 'https://vanityvow.com/api/v1/settings/google-drive/callback';
+
 export function resolvePublicUrls(hostHeader?: string) {
-  const host = (hostHeader || '').split(',')[0].split(':')[0].trim();
-  const envClient = (process.env.CLIENT_URL || '').replace(/\/sun\/?$/, '');
-  const isLive = host.includes('vanityvow.com') || envClient.includes('vanityvow.com');
-  const liveHost = host.includes('www.vanityvow.com') ? 'www.vanityvow.com' : 'vanityvow.com';
-  const clientUrl = isLive
-    ? `https://${liveHost}`
-    : (envClient && !envClient.includes('localhost') ? envClient : config.clientUrl);
-  const redirectUri = isLive
-    ? `https://${liveHost}/api/v1/settings/google-drive/callback`
-    : (process.env.GOOGLE_DRIVE_REDIRECT_URI || config.googleDrive.redirectUri);
-  return { clientUrl, redirectUri };
+  const haystack = [
+    hostHeader || '',
+    process.env.CLIENT_URL || '',
+    process.env.GOOGLE_DRIVE_REDIRECT_URI || '',
+    config.clientUrl,
+    config.googleDrive.redirectUri,
+  ].join(' ');
+  const isLive = haystack.includes('vanityvow.com');
+  if (isLive) {
+    return { clientUrl: LIVE_CLIENT_URL, redirectUri: LIVE_REDIRECT_URI };
+  }
+  return {
+    clientUrl: config.clientUrl,
+    redirectUri: process.env.GOOGLE_DRIVE_REDIRECT_URI || config.googleDrive.redirectUri,
+  };
 }
 
 const LEGACY_DRIVE_CLIENT_IDS = new Set([

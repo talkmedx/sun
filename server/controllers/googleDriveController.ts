@@ -4,14 +4,19 @@ import { AppError } from '../utils/errors';
 import * as googleDrive from '../services/googleDriveService';
 
 function requestHost(req: Request) {
-  const forwarded = req.get('x-forwarded-host');
-  if (forwarded) return forwarded;
-  const origin = req.get('origin') || req.get('referer') || '';
-  try {
-    if (origin) return new URL(origin).host;
-  } catch {
-    // ignore
+  const candidates = [
+    req.get('origin'),
+    req.get('referer'),
+    req.get('x-forwarded-host'),
+    req.get('host'),
+  ];
+  for (const value of candidates) {
+    if (!value) continue;
+    const haystack = value.toLowerCase();
+    if (haystack.includes('vanityvow.com')) return 'vanityvow.com';
   }
+  const forwarded = req.get('x-forwarded-host');
+  if (forwarded) return forwarded.split(',')[0].trim();
   return String(req.get('host') || '');
 }
 
