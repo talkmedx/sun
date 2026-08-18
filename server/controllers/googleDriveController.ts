@@ -56,7 +56,7 @@ export async function callback(req: Request, res: Response) {
   try {
     const code = String(req.query.code || '');
     const state = String(req.query.state || '');
-    if (!code || !state) {
+    if (!code) {
       throw new Error('Missing OAuth code');
     }
     const redirectTo = await googleDrive.handleOAuthCallback(code, state, requestHost(req));

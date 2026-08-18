@@ -4,7 +4,7 @@
  * 1. Fill GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET in server/.env
  * 2. Add redirect URI http://localhost:4100/callback to the OAuth client
  * 3. Run: npm run drive:auth
- * 4. Sign in as talkmedx@gmail.com
+ * 4. Sign in as vowvanity@gmail.com
  */
 import http from 'http';
 import { URL } from 'url';
@@ -34,6 +34,7 @@ async function main() {
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
+    login_hint: config.googleDrive.accountEmail,
   });
 
   const server = http.createServer(async (req, res) => {
@@ -85,7 +86,7 @@ async function main() {
   });
 
   server.listen(4100, () => {
-    console.log('\nOpen this URL and sign in as talkmedx@gmail.com:\n');
+    console.log('\nOpen this URL and sign in as vowvanity@gmail.com:\n');
     console.log(authUrl);
     console.log('\nWaiting for Google callback on http://localhost:4100/callback ...\n');
   });

@@ -31,37 +31,48 @@ export type DriveUploadItem = {
 };
 
 export function resolvePublicUrls(hostHeader?: string) {
-  const host = (hostHeader || '').split(':')[0].trim();
-  const isLive = host.includes('vanityvow.com');
+  const host = (hostHeader || '').split(',')[0].split(':')[0].trim();
+  const envClient = (process.env.CLIENT_URL || '').replace(/\/sun\/?$/, '');
+  const isLive = host.includes('vanityvow.com') || envClient.includes('vanityvow.com');
+  const liveHost = host.includes('www.vanityvow.com') ? 'www.vanityvow.com' : 'vanityvow.com';
   const clientUrl = isLive
-    ? `https://${host}`
-    : (process.env.CLIENT_URL && !process.env.CLIENT_URL.includes('localhost')
-      ? process.env.CLIENT_URL
-      : config.clientUrl);
+    ? `https://${liveHost}`
+    : (envClient && !envClient.includes('localhost') ? envClient : config.clientUrl);
   const redirectUri = isLive
-    ? `https://${host}/api/v1/settings/google-drive/callback`
+    ? `https://${liveHost}/api/v1/settings/google-drive/callback`
     : (process.env.GOOGLE_DRIVE_REDIRECT_URI || config.googleDrive.redirectUri);
   return { clientUrl, redirectUri };
 }
+
+const LEGACY_DRIVE_CLIENT_IDS = new Set([
+  '337775424400-ftfnkebn5hnaqgn5nvspggjb6ccbnigp.apps.googleusercontent.com',
+  '337775424400-eb521fre1oijnf7863759oc6bmdvnf3a.apps.googleusercontent.com',
+]);
 
 function isGoogleClientId(value: string) {
   return /\.apps\.googleusercontent\.com$/.test(value.trim());
 }
 
+function usableClientId(value?: string | null) {
+  const id = (value || '').trim();
+  if (!isGoogleClientId(id) || LEGACY_DRIVE_CLIENT_IDS.has(id)) return '';
+  return id;
+}
+
 async function getClientId(): Promise<string> {
-  if (isGoogleClientId(config.googleDrive.clientId)) return config.googleDrive.clientId;
-  if (cachedClientId !== undefined) {
-    return isGoogleClientId(cachedClientId || '') ? cachedClientId || '' : '';
-  }
+  if (cachedClientId !== undefined) return usableClientId(cachedClientId);
   cachedClientId = await getSetting(SETTING_CLIENT_ID);
-  return isGoogleClientId(cachedClientId || '') ? cachedClientId || '' : '';
+  const fromDb = usableClientId(cachedClientId);
+  if (fromDb) return fromDb;
+  return usableClientId(config.googleDrive.clientId);
 }
 
 async function getClientSecret(): Promise<string> {
-  if (config.googleDrive.clientSecret) return config.googleDrive.clientSecret;
   if (cachedClientSecret !== undefined) return cachedClientSecret || '';
   cachedClientSecret = await getSetting(SETTING_CLIENT_SECRET);
-  return cachedClientSecret || '';
+  if (cachedClientSecret) return cachedClientSecret;
+  if (usableClientId(config.googleDrive.clientId)) return config.googleDrive.clientSecret;
+  return '';
 }
 
 async function oauthClient(redirectUri?: string): Promise<OAuth2Client> {
@@ -111,10 +122,10 @@ async function clearSetting(key: string) {
 }
 
 async function getStoredRefreshToken(): Promise<string | null> {
-  if (config.googleDrive.refreshToken) return config.googleDrive.refreshToken;
   if (cachedRefreshToken !== undefined) return cachedRefreshToken;
   cachedRefreshToken = await getSetting(SETTING_REFRESH);
-  return cachedRefreshToken;
+  if (cachedRefreshToken) return cachedRefreshToken;
+  return config.googleDrive.refreshToken || null;
 }
 
 async function getStoredEmail(): Promise<string | null> {
@@ -333,6 +344,7 @@ export function archiveUploads(opts: {
 }
 
 export async function getDriveStatus(hostHeader?: string) {
+  await purgeLegacyDriveSetup();
   const ready = await isDriveReady();
   const email = (await getStoredEmail()) || (ready ? config.googleDrive.accountEmail : null);
   const { redirectUri } = resolvePublicUrls(hostHeader);
@@ -348,6 +360,17 @@ export async function getDriveStatus(hostHeader?: string) {
     clientId: clientId || '',
     usingServiceAccount: hasServiceAccount(),
   };
+}
+
+async function purgeLegacyDriveSetup() {
+  const storedEmail = ((await getSetting(SETTING_EMAIL)) || '').trim().toLowerCase();
+  const storedClient = ((await getSetting(SETTING_CLIENT_ID)) || '').trim();
+  const expected = config.googleDrive.accountEmail.trim().toLowerCase();
+  const legacyClient = Boolean(storedClient && LEGACY_DRIVE_CLIENT_IDS.has(storedClient));
+  const wrongAccount = Boolean(storedEmail && expected && storedEmail !== expected);
+  if (legacyClient || wrongAccount) {
+    await disconnectDrive();
+  }
 }
 
 export async function saveAppCredentials(clientId: string, clientSecret: string, refreshToken?: string) {
@@ -376,9 +399,14 @@ export async function saveAppCredentials(clientId: string, clientSecret: string,
   }
   cachedClientId = id;
   cachedClientSecret = secret;
+  cachedRefreshToken = null;
+  cachedEmail = null;
   await upsertSetting(SETTING_CLIENT_ID, id, 'Google Drive OAuth client ID');
   await upsertSetting(SETTING_CLIENT_SECRET, secret, 'Google Drive OAuth client secret');
-  const token = refreshToken?.trim() || config.googleDrive.refreshToken;
+  await clearSetting(SETTING_REFRESH);
+  await clearSetting(SETTING_EMAIL);
+  await clearSetting(SETTING_SA_JSON);
+  const token = refreshToken?.trim();
   if (token) {
     cachedRefreshToken = token;
     await upsertSetting(SETTING_REFRESH, token, 'Google Drive OAuth refresh token');
@@ -393,21 +421,32 @@ export async function connectWithCredentials(
   },
   hostHeader?: string
 ) {
-  await saveAppCredentials(opts.clientId, opts.clientSecret, opts.refreshToken);
+  const id = opts.clientId.trim();
+  const secret = opts.clientSecret.trim();
+  if (secret) {
+    await saveAppCredentials(id, secret, opts.refreshToken);
+  } else if (!(await hasOAuthAppCredentials())) {
+    throw new Error('Paste the Google Client ID and Client secret first.');
+  }
   folderCache.clear();
 
   const drive = await getDrive();
   if (drive) {
     const about = await drive.about.get({ fields: 'user(emailAddress,displayName)' });
-    const email = about.data.user?.emailAddress || config.googleDrive.accountEmail;
-    cachedEmail = email;
-    await upsertSetting(SETTING_EMAIL, email, 'Connected Google Drive account');
-    return {
-      ...(await getDriveStatus(hostHeader)),
-      connected: true,
-      email,
-      authUrl: null as string | null,
-    };
+    const email = about.data.user?.emailAddress || '';
+    const expected = config.googleDrive.accountEmail.trim().toLowerCase();
+    if (email && expected && email.toLowerCase() !== expected) {
+      await disconnectDrive();
+    } else {
+      cachedEmail = email || config.googleDrive.accountEmail;
+      await upsertSetting(SETTING_EMAIL, cachedEmail, 'Connected Google Drive account');
+      return {
+        ...(await getDriveStatus(hostHeader)),
+        connected: true,
+        email: cachedEmail,
+        authUrl: null as string | null,
+      };
+    }
   }
 
   const { authUrl } = await startConnect(hostHeader);
@@ -430,10 +469,11 @@ export async function startConnect(hostHeader?: string): Promise<{ authUrl: stri
   return {
     authUrl: client.generateAuthUrl({
       access_type: 'offline',
-      prompt: 'consent',
+                      prompt: 'select_account consent',
       scope: DRIVE_SCOPE,
       state,
       include_granted_scopes: true,
+      login_hint: config.googleDrive.accountEmail,
     }),
   };
 }
@@ -461,30 +501,45 @@ async function persistTokens(client: OAuth2Client, tokens: Credentials) {
     throw new Error('Google did not return a refresh token. Disconnect the app from Google Account permissions and try again.');
   }
 
+  client.setCredentials(tokens);
+  let email = '';
+  try {
+    const oauth2 = google.oauth2({ version: 'v2', auth: client });
+    const { data } = await oauth2.userinfo.get();
+    email = (data.email || '').trim();
+  } catch (err) {
+    console.warn('[Google Drive] Could not read connected email:', (err as Error).message);
+  }
+
+  const expected = config.googleDrive.accountEmail.trim().toLowerCase();
+  if (email && expected && email.toLowerCase() !== expected) {
+    throw new Error(`Please allow access as ${config.googleDrive.accountEmail}, not ${email}.`);
+  }
+
   if (tokens.refresh_token) {
     cachedRefreshToken = tokens.refresh_token;
     await upsertSetting(SETTING_REFRESH, tokens.refresh_token, 'Google Drive OAuth refresh token');
   }
 
-  client.setCredentials(tokens);
-  try {
-    const oauth2 = google.oauth2({ version: 'v2', auth: client });
-    const { data } = await oauth2.userinfo.get();
-    if (data.email) {
-      cachedEmail = data.email;
-      await upsertSetting(SETTING_EMAIL, data.email, 'Connected Google Drive account');
-    }
-  } catch (err) {
-    console.warn('[Google Drive] Could not read connected email:', (err as Error).message);
+  if (email) {
+    cachedEmail = email;
+    await upsertSetting(SETTING_EMAIL, email, 'Connected Google Drive account');
   }
 }
 
 export async function disconnectDrive() {
   cachedRefreshToken = null;
   cachedEmail = null;
+  cachedClientId = null;
+  cachedClientSecret = null;
   folderCache.clear();
   await clearSetting(SETTING_REFRESH);
   await clearSetting(SETTING_EMAIL);
+  await clearSetting(SETTING_CLIENT_ID);
+  await clearSetting(SETTING_CLIENT_SECRET);
+  await clearSetting(SETTING_SA_JSON);
+  await clearSetting(SETTING_OAUTH_STATE);
+  await clearSetting(SETTING_REDIRECT);
 }
 
 export async function logDriveStatus() {

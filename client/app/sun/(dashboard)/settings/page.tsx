@@ -14,23 +14,21 @@ import { useAuthStore } from '@/store';
 import { getErrorMessage } from '@/lib/api';
 import { isAdmin } from '@/lib/permissions';
 
-const PRODUCTION_DRIVE_CLIENT_ID =
-  '337775424400-ftfnkebn5hnaqgn5nvspggjb6ccbnigp.apps.googleusercontent.com';
+const DRIVE_ACCOUNT = 'vowvanity@gmail.com';
+const NEW_DRIVE_CLIENT_ID =
+  '1062631179820-ffgpleimt0n2qn7r648rbr6q38cv8ios.apps.googleusercontent.com';
 
 function resolveClientId(raw: string) {
   const value = raw.trim();
   if (value.includes('apps.googleusercontent.com')) return value;
-  if (typeof window !== 'undefined' && window.location.hostname.includes('vanityvow.com')) {
-    return PRODUCTION_DRIVE_CLIENT_ID;
-  }
-  return value;
+  return NEW_DRIVE_CLIENT_ID;
 }
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
   const [connecting, setConnecting] = useState(false);
-  const [clientId, setClientId] = useState(PRODUCTION_DRIVE_CLIENT_ID);
+  const [clientId, setClientId] = useState(NEW_DRIVE_CLIENT_ID);
   const [clientSecret, setClientSecret] = useState('');
   const canManageDrive = isAdmin(user?.role);
 
@@ -45,8 +43,11 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (driveQuery.data?.clientId?.includes('apps.googleusercontent.com')) {
-      setClientId(driveQuery.data.clientId);
+    const stored = driveQuery.data?.clientId || '';
+    if (stored.includes('apps.googleusercontent.com')) {
+      setClientId(stored);
+    } else {
+      setClientId(NEW_DRIVE_CLIENT_ID);
     }
   }, [driveQuery.data?.clientId]);
 
@@ -262,34 +263,51 @@ export default function SettingsPage() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {driveQuery.data?.connected
-                        ? `Saving to ${driveQuery.data.email || driveQuery.data.expectedEmail}`
-                        : `Connect ${driveQuery.data?.expectedEmail || 'talkmedx@gmail.com'} so new documents go to Google Drive.`}
+                        ? `Saving to ${driveQuery.data.email || DRIVE_ACCOUNT}`
+                        : `New setup: connect the Drive for ${DRIVE_ACCOUNT}. Do not use the old komalsmakeover project.`}
                     </p>
                   </div>
-                  {driveQuery.data?.connected ? (
+                  {(driveQuery.data?.connected || driveQuery.data?.appConfigured) && (
                     <Button
                       variant="outline"
                       onClick={() => disconnectDrive.mutate()}
                       disabled={disconnectDrive.isPending}
                     >
                       {disconnectDrive.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button onClick={connectDrive} disabled={connecting}>
-                      {connecting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-                      Connect Google Drive
+                      {driveQuery.data?.connected ? 'Disconnect' : 'Clear old setup'}
                     </Button>
                   )}
                 </div>
 
                 {!driveQuery.data?.connected && (
                   <div className="space-y-3 rounded-xl border border-border/50 p-4">
-                    <p className="text-sm font-medium">Google Cloud credentials</p>
-                    <p className="text-xs text-muted-foreground">
-                      Client ID is already filled. Paste the Client secret, then click Connect. Allow access once as{' '}
-                      <strong>talkmedx@gmail.com</strong> — after that, uploads go to Drive automatically.
-                    </p>
+                    <p className="text-sm font-medium">New Google Cloud app for {DRIVE_ACCOUNT}</p>
+                    <ol className="list-decimal pl-4 space-y-1.5 text-xs text-muted-foreground">
+                      <li>
+                        Open{' '}
+                        <a
+                          className="underline text-foreground"
+                          href="https://console.cloud.google.com/"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Google Cloud Console
+                        </a>{' '}
+                        signed in as <strong className="text-foreground">{DRIVE_ACCOUNT}</strong>
+                      </li>
+                      <li>Create a <strong className="text-foreground">new project</strong> (do not open komalsmakeover-68050)</li>
+                      <li>Enable <strong className="text-foreground">Google Drive API</strong></li>
+                      <li>
+                        OAuth consent screen → External → add test user <strong className="text-foreground">{DRIVE_ACCOUNT}</strong>
+                      </li>
+                      <li>
+                        Credentials → Create OAuth client → Web application. Authorized redirect URI:
+                        <code className="mt-1 block break-all rounded-md bg-muted px-2 py-1 text-[11px] text-foreground">
+                          {driveQuery.data?.redirectUri || 'https://vanityvow.com/api/v1/settings/google-drive/callback'}
+                        </code>
+                      </li>
+                      <li>Paste the new Client ID and Client secret below, then Connect. Allow access as {DRIVE_ACCOUNT}.</li>
+                    </ol>
                     <div className="hidden" aria-hidden="true">
                       <input type="text" name="username" autoComplete="username" />
                       <input type="password" name="password" autoComplete="current-password" />
@@ -302,6 +320,7 @@ export default function SettingsPage() {
                         spellCheck={false}
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
+                        placeholder="xxxxx.apps.googleusercontent.com"
                       />
                     </div>
                     <div className="space-y-1.5">

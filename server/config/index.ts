@@ -39,7 +39,7 @@ export const config = {
     refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '',
     serviceAccountFile: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE || '',
     rootFolder: process.env.GOOGLE_DRIVE_ROOT_FOLDER || "komal's Makeover",
-    accountEmail: process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL || 'talkmedx@gmail.com',
+    accountEmail: process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL || 'vowvanity@gmail.com',
   },
 
   rateLimit: {

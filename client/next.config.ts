@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/settings/google-drive/callback',
+        destination: '/sun/google-drive/callback',
+        permanent: false,
+      },
+      {
+        source: '/sun/settings/google-drive/callback',
+        destination: '/sun/google-drive/callback',
+        permanent: false,
+      },
+      {
         source: '/dashboard',
         destination: '/sun/dashboard',
         permanent: false,
@@ -74,6 +84,10 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
+      {
+        source: '/api/v1/:path*',
+        destination: 'http://localhost:5001/api/v1/:path*',
+      },
       {
         source: '/uploads/:path*',
         destination: 'http://localhost:5001/uploads/:path*',
