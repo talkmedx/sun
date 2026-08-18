@@ -6,7 +6,7 @@ export function fileTooLargeMessage(fileName?: string) {
   return `${name} too large. Please upload a document smaller than ${MAX_UPLOAD_FILE_MB} MB.`;
 }
 
-function isPdf(file: File) {
+export function isPdf(file: File) {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 }
 

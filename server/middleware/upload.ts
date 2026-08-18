@@ -13,6 +13,8 @@ const ALLOWED_MIME = new Set([
   'image/webp',
   'image/gif',
   'application/pdf',
+  'application/x-pdf',
+  'application/octet-stream',
 ]);
 
 function ensureDir(dir: string) {
@@ -39,10 +41,15 @@ function fileFilter(
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) {
-  if (!ALLOWED_MIME.has(file.mimetype)) {
-    return cb(new AppError('Invalid file type. Allowed: JPEG, PNG, WebP, GIF, PDF', 400));
+  const name = file.originalname.toLowerCase();
+  const allowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf'];
+  if (ALLOWED_MIME.has(file.mimetype) || allowedExt.some((ext) => name.endsWith(ext))) {
+    if (file.mimetype === 'application/octet-stream' && !name.endsWith('.pdf')) {
+      return cb(new AppError('Invalid file type. Allowed: JPEG, PNG, WebP, GIF, PDF', 400));
+    }
+    return cb(null, true);
   }
-  cb(null, true);
+  return cb(new AppError('Invalid file type. Allowed: JPEG, PNG, WebP, GIF, PDF', 400));
 }
 
 const limits = {
