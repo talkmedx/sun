@@ -355,7 +355,16 @@ export function archiveUploads(opts: {
   personName: string;
   date?: string | Date | null;
 }): void {
-  const files = opts.files.filter((f): f is DriveUploadItem => Boolean(f.file));
+  const files: DriveUploadItem[] = opts.files
+    .filter((item): item is { file: Express.Multer.File; label?: string } => Boolean(item.file))
+    .map((item) => ({
+      file: {
+        path: item.file.path,
+        originalname: item.file.originalname,
+        mimetype: item.file.mimetype,
+      },
+      label: item.label,
+    }));
   if (!files.length) return;
   void uploadDocuments({ files, personName: opts.personName, date: opts.date }).catch((err) => {
     console.error('[Google Drive] Archive failed:', (err as Error).message);
