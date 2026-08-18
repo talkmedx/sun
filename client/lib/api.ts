@@ -85,7 +85,7 @@ export interface ApiResponse<T> {
 export function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     if (err.response?.status === 413) {
-      return 'The photo or proof is too large. Please upload a document smaller than 2 MB.';
+      return 'This upload is too large. Please use a smaller photo or PDF.';
     }
     const data = err.response?.data as {
       message?: string;
