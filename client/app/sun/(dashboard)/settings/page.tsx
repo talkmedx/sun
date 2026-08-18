@@ -241,7 +241,7 @@ export default function SettingsPage() {
             </div>
             <CardDescription>
               Admission photos, proofs, and other panel documents are stored in{' '}
-              <span className="font-medium text-foreground">komal&apos;s Makeover / student name current-date</span>
+              <span className="font-medium text-foreground">komal&apos;s makeover / full name current date-time</span>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

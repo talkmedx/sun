@@ -4,7 +4,7 @@ import { google, drive_v3 } from 'googleapis';
 import type { Credentials, JWTInput, OAuth2Client } from 'google-auth-library';
 import { RowDataPacket } from 'mysql2';
 import { config } from '../config';
-import { execute, queryOne } from '../config/database';
+import { execute, query, queryOne } from '../config/database';
 
 const DRIVE_SCOPE = [
   'https://www.googleapis.com/auth/drive',
@@ -18,6 +18,8 @@ const SETTING_CLIENT_ID = 'google_drive_client_id';
 const SETTING_CLIENT_SECRET = 'google_drive_client_secret';
 const SETTING_SA_JSON = 'google_drive_service_account_json';
 const SETTING_REDIRECT = 'google_drive_oauth_redirect';
+const SETTING_PENDING = 'google_drive_pending_uploads';
+const SETTING_ARCHIVED_ADMISSIONS = 'google_drive_archived_admissions';
 
 const folderCache = new Map<string, string>();
 let cachedRefreshToken: string | null | undefined;
@@ -25,8 +27,14 @@ let cachedEmail: string | null | undefined;
 let cachedClientId: string | null | undefined;
 let cachedClientSecret: string | null | undefined;
 
+export type DriveFileRef = {
+  path: string;
+  originalname: string;
+  mimetype?: string;
+};
+
 export type DriveUploadItem = {
-  file: Express.Multer.File;
+  file: DriveFileRef;
   label?: string;
 };
 
@@ -205,12 +213,14 @@ export function personDisplayName(...parts: Array<string | null | undefined>): s
 }
 
 export function folderDate(value?: string | Date | null): string {
-  const date = value instanceof Date ? value : new Date();
+  const date = value instanceof Date ? value : value ? new Date(value) : new Date();
   const use = Number.isNaN(date.getTime()) ? new Date() : date;
   const dd = String(use.getDate()).padStart(2, '0');
   const mm = String(use.getMonth() + 1).padStart(2, '0');
   const yyyy = use.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
+  const hh = String(use.getHours()).padStart(2, '0');
+  const min = String(use.getMinutes()).padStart(2, '0');
+  return `${dd}-${mm}-${yyyy} ${hh}-${min}`;
 }
 
 export function studentFolderName(personName: string, date?: string | Date | null): string {
@@ -261,10 +271,11 @@ async function findOrCreateFolder(
 
 async function ensureStudentDocsFolder(
   drive: drive_v3.Drive,
-  personName: string
+  personName: string,
+  when?: string | Date | null
 ): Promise<{ folderId: string; folderName: string }> {
   const rootId = await findOrCreateFolder(drive, config.googleDrive.rootFolder);
-  const folderName = studentFolderName(personName, new Date());
+  const folderName = studentFolderName(personName, when || new Date());
   const folderId = await findOrCreateFolder(drive, folderName, rootId);
   return { folderId, folderName };
 }
@@ -309,12 +320,13 @@ export async function uploadDocuments(opts: {
 
   const drive = await getDrive();
   if (!drive) {
-    console.warn('[Google Drive] Not connected — documents saved locally only');
+    console.warn('[Google Drive] Not connected — queuing documents for later');
+    await enqueuePendingUploads(opts.personName, files);
     return 0;
   }
 
   const personName = personDisplayName(opts.personName);
-  const { folderId, folderName } = await ensureStudentDocsFolder(drive, personName);
+  const { folderId, folderName } = await ensureStudentDocsFolder(drive, personName, opts.date || new Date());
 
   let uploaded = 0;
   for (const item of files) {
@@ -362,7 +374,7 @@ export async function getDriveStatus(hostHeader?: string) {
     email,
     expectedEmail: config.googleDrive.accountEmail,
     rootFolder: config.googleDrive.rootFolder,
-    folderPattern: '{student name} {DD-MM-YYYY}',
+    folderPattern: '{full name} {DD-MM-YYYY HH-mm}',
     redirectUri,
     clientId: clientId || '',
     usingServiceAccount: hasServiceAccount(),
@@ -498,6 +510,7 @@ export async function handleOAuthCallback(code: string, state: string, hostHeade
   await persistTokens(client, tokens);
   await clearSetting(SETTING_OAUTH_STATE);
   folderCache.clear();
+  void flushPendingArchives();
 
   const email = cachedEmail || config.googleDrive.accountEmail;
   return `${clientUrl}/sun/settings?drive=connected&email=${encodeURIComponent(email || '')}`;
@@ -554,6 +567,7 @@ export async function logDriveStatus() {
     const status = await getDriveStatus();
     if (status.connected) {
       console.log(`✅ Google Drive connected (${status.email || 'account linked'})`);
+      void flushPendingArchives();
     } else if (status.appConfigured) {
       console.log('⚠️  Google Drive app is configured but not connected. Open Settings → Google Drive.');
     } else {
@@ -561,5 +575,136 @@ export async function logDriveStatus() {
     }
   } catch {
     // ignore during boot if DB is not ready
+  }
+}
+
+type PendingJob = {
+  personName: string;
+  files: Array<{ path: string; originalname: string; mimetype?: string; label?: string }>;
+};
+
+async function enqueuePendingUploads(personName: string, files: DriveUploadItem[]) {
+  const job: PendingJob = {
+    personName,
+    files: files.map((item) => ({
+      path: item.file.path,
+      originalname: item.file.originalname,
+      mimetype: item.file.mimetype,
+      label: item.label,
+    })),
+  };
+  let list: PendingJob[] = [];
+  try {
+    const raw = await getSetting(SETTING_PENDING);
+    if (raw) list = JSON.parse(raw) as PendingJob[];
+  } catch {
+    list = [];
+  }
+  list.push(job);
+  await upsertSetting(SETTING_PENDING, JSON.stringify(list.slice(-40)), 'Pending Google Drive uploads');
+}
+
+export async function flushPendingArchives() {
+  const drive = await getDrive();
+  if (!drive) return;
+  await flushPendingQueue();
+  await archiveRecentAdmissionsFromDisk();
+}
+
+async function flushPendingQueue() {
+  const raw = await getSetting(SETTING_PENDING);
+  if (!raw) return;
+  let list: PendingJob[] = [];
+  try {
+    list = JSON.parse(raw) as PendingJob[];
+  } catch {
+    await clearSetting(SETTING_PENDING);
+    return;
+  }
+  await clearSetting(SETTING_PENDING);
+  for (const job of list) {
+    const files = job.files
+      .filter((file) => file.path && fs.existsSync(file.path))
+      .map((file) => ({ file, label: file.label }));
+    if (files.length) {
+      await uploadDocuments({ files, personName: job.personName, date: new Date() });
+    }
+  }
+}
+
+function mimeFromName(name: string) {
+  const ext = path.extname(name).toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.gif') return 'image/gif';
+  return 'image/jpeg';
+}
+
+function fileFromPublicUrl(url?: string | null, label?: string): DriveUploadItem | null {
+  if (!url) return null;
+  const relative = String(url).replace(/^\//, '');
+  const localPath = path.join(process.cwd(), relative);
+  if (!fs.existsSync(localPath)) return null;
+  return {
+    file: {
+      path: localPath,
+      originalname: path.basename(localPath),
+      mimetype: mimeFromName(localPath),
+    },
+    label,
+  };
+}
+
+async function archiveRecentAdmissionsFromDisk() {
+  try {
+    let archived: number[] = [];
+    try {
+      const raw = await getSetting(SETTING_ARCHIVED_ADMISSIONS);
+      if (raw) archived = JSON.parse(raw) as number[];
+    } catch {
+      archived = [];
+    }
+    const archivedSet = new Set(archived);
+
+    const admissions = await query<RowDataPacket[]>(
+      `SELECT id, first_name, last_name, photo_url, proof_url
+       FROM admissions
+       WHERE deleted_at IS NULL
+       ORDER BY id DESC
+       LIMIT 25`
+    );
+    for (const row of admissions) {
+      const id = Number(row.id);
+      if (archivedSet.has(id)) continue;
+      const personName = personDisplayName(String(row.first_name || ''), String(row.last_name || ''));
+      const files: DriveUploadItem[] = [];
+      const photo = fileFromPublicUrl(row.photo_url, 'Photo');
+      if (photo) files.push(photo);
+      const legacyProof = fileFromPublicUrl(row.proof_url, 'Proof');
+      if (legacyProof) files.push(legacyProof);
+      const docs = await query<RowDataPacket[]>(
+        `SELECT title, file_url FROM documents
+         WHERE entity_type = 'admission' AND entity_id = :id AND deleted_at IS NULL`,
+        { id }
+      );
+      for (const doc of docs) {
+        const item = fileFromPublicUrl(doc.file_url, String(doc.title || 'Proof'));
+        if (item) files.push(item);
+      }
+      if (!files.length) {
+        archivedSet.add(id);
+        continue;
+      }
+      await uploadDocuments({ files, personName, date: new Date() });
+      archivedSet.add(id);
+    }
+    await upsertSetting(
+      SETTING_ARCHIVED_ADMISSIONS,
+      JSON.stringify(Array.from(archivedSet).slice(-200)),
+      'Admission IDs already copied to Google Drive'
+    );
+  } catch (err) {
+    console.warn('[Google Drive] Could not archive existing admissions:', (err as Error).message);
   }
 }

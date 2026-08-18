@@ -38,7 +38,7 @@ export const config = {
       'http://localhost:5001/api/v1/settings/google-drive/callback',
     refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '',
     serviceAccountFile: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE || '',
-    rootFolder: process.env.GOOGLE_DRIVE_ROOT_FOLDER || "komal's Makeover",
+    rootFolder: process.env.GOOGLE_DRIVE_ROOT_FOLDER || "komal's makeover",
     accountEmail: process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL || 'vowvanity@gmail.com',
   },
 

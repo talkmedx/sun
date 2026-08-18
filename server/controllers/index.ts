@@ -537,7 +537,7 @@ export const admissions = {
           ...proofFiles.map((f, i) => ({ file: f, label: titleArr[i] || 'Proof' })),
         ],
         personName: personDisplayName(String(req.body.first_name || ''), String(req.body.last_name || '')),
-        date: String(req.body.admission_date || new Date()),
+        date: new Date(),
       });
       return created(res, createdAdmission, 'Application submitted');
     } catch (e) { next(e); }
@@ -586,7 +586,7 @@ export const admissions = {
           ...proofFiles.map((f, i) => ({ file: f, label: titleArr[i] || 'Proof' })),
         ],
         personName: personDisplayName(String(req.body.first_name || updated.first_name || ''), String(req.body.last_name || updated.last_name || '')),
-        date: String(req.body.admission_date || updated.admission_date || new Date()),
+        date: new Date(),
       });
       return success(res, updated, 'Updated');
     } catch (e) { next(e); }
