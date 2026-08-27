@@ -42,14 +42,14 @@ export default function ProductsPage() {
 
   const form = useForm({
     defaultValues: {
-      name: '', sku: '', cost_price: '', selling_price: '',
+      name: '', sku: '', mrp: '', cost_price: '', selling_price: '',
       quantity_available: '0', vendor_id: 'none', description: '',
     },
   });
 
   const editForm = useForm({
     defaultValues: {
-      name: '', sku: '', cost_price: '', selling_price: '',
+      name: '', sku: '', mrp: '', cost_price: '', selling_price: '',
       quantity_available: '0', vendor_id: 'none', description: '',
     },
   });
@@ -59,6 +59,7 @@ export default function ProductsPage() {
     editForm.reset({
       name: p.name || '',
       sku: p.sku || '',
+      mrp: String(p.mrp || ''),
       cost_price: String(p.cost_price || ''),
       selling_price: String(p.selling_price || ''),
       quantity_available: String(p.quantity_available ?? '0'),
@@ -71,7 +72,18 @@ export default function ProductsPage() {
   // Fetch Summary Cards metrics
   const { data: summaryData } = useQuery({
     queryKey: ['products-summary'],
-    queryFn: async () => (await productsApi.summary()).data.data,
+    queryFn: async () => (await productsApi.summary()).data.data as {
+      units_available: number;
+      total_mrp_available: number;
+      total_cost_available: number;
+      total_selling_available: number;
+      total_profit_available: number;
+      units_sold: number;
+      total_mrp_sold: number;
+      total_cost_sold: number;
+      total_selling_sold: number;
+      total_profit_sold: number;
+    },
   });
 
   const { data: vendors } = useQuery({
@@ -98,6 +110,7 @@ export default function ProductsPage() {
     mutationFn: (v: Record<string, string>) =>
       productsApi.create({
         ...v,
+        mrp: Number(v.mrp),
         cost_price: Number(v.cost_price),
         selling_price: Number(v.selling_price),
         quantity_available: Number(v.quantity_available || 0),
@@ -109,7 +122,7 @@ export default function ProductsPage() {
       qc.invalidateQueries({ queryKey: ['products-summary'] });
       setOpen(false);
       form.reset({
-        name: '', sku: '', cost_price: '', selling_price: '',
+        name: '', sku: '', mrp: '', cost_price: '', selling_price: '',
         quantity_available: '0', vendor_id: 'none', description: '',
       });
     },
@@ -121,6 +134,7 @@ export default function ProductsPage() {
       if (!editingProduct) throw new Error('No product selected');
       return productsApi.update(editingProduct.id, {
         ...v,
+        mrp: Number(v.mrp),
         cost_price: Number(v.cost_price),
         selling_price: Number(v.selling_price),
         quantity_available: Number(v.quantity_available || 0),
@@ -149,6 +163,7 @@ export default function ProductsPage() {
 
   // Calculate Product Row metrics
   const computeProductMetrics = (p: Product) => {
+    const mrp = Number(p.mrp || 0);
     const costPrice = Number(p.cost_price || 0);
     const sellingPrice = Number(p.selling_price || 0);
     const qtyAvailable = Number(p.quantity_available || 0);
@@ -156,14 +171,17 @@ export default function ProductsPage() {
     const totalSellingPrice = sellingPrice * qtyAvailable;
     const totalProfit = (sellingPrice - costPrice) * qtyAvailable;
     const profitPercent = costPrice > 0 ? (((sellingPrice - costPrice) * 100) / costPrice).toFixed(1) : '0';
+    const studentDiscount = mrp - sellingPrice;
 
     return {
+      mrp,
       costPrice,
       sellingPrice,
       qtyAvailable,
       totalSellingPrice,
       totalProfit,
       profitPercent,
+      studentDiscount,
     };
   };
 
@@ -186,13 +204,14 @@ export default function ProductsPage() {
             <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-3">
               <div className="space-y-1"><Label>Product Name *</Label><Input {...form.register('name', { required: true })} /></div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label>MRP (₹) *</Label><Input type="number" step="0.01" {...form.register('mrp', { required: true })} /></div>
                 <div className="space-y-1"><Label>Cost Price (₹) *</Label><Input type="number" step="0.01" {...form.register('cost_price', { required: true })} /></div>
-                <div className="space-y-1"><Label>Selling Price (₹) *</Label><Input type="number" step="0.01" {...form.register('selling_price', { required: true })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label>Selling Price (₹) *</Label><Input type="number" step="0.01" {...form.register('selling_price', { required: true })} /></div>
                 <div className="space-y-1"><Label>Quantity of units *</Label><Input type="number" {...form.register('quantity_available', { required: true })} /></div>
-                <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...form.register('sku')} /></div>
               </div>
+              <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...form.register('sku')} /></div>
               <div className="space-y-1">
                 <Label>Vendor</Label>
                 <Select value={form.watch('vendor_id')} onValueChange={(v) => form.setValue('vendor_id', v)}>
@@ -218,13 +237,14 @@ export default function ProductsPage() {
             <form onSubmit={editForm.handleSubmit((v) => updateMutation.mutate(v))} className="space-y-3">
               <div className="space-y-1"><Label>Product Name *</Label><Input {...editForm.register('name', { required: true })} /></div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label>MRP (₹) *</Label><Input type="number" step="0.01" {...editForm.register('mrp', { required: true })} /></div>
                 <div className="space-y-1"><Label>Cost Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('cost_price', { required: true })} /></div>
-                <div className="space-y-1"><Label>Selling Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('selling_price', { required: true })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label>Selling Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('selling_price', { required: true })} /></div>
                 <div className="space-y-1"><Label>Quantity of units *</Label><Input type="number" {...editForm.register('quantity_available', { required: true })} /></div>
-                <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...editForm.register('sku')} /></div>
               </div>
+              <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...editForm.register('sku')} /></div>
               <div className="space-y-1">
                 <Label>Vendor</Label>
                 <Select value={editForm.watch('vendor_id')} onValueChange={(v) => editForm.setValue('vendor_id', v)}>
@@ -244,16 +264,15 @@ export default function ProductsPage() {
         </Dialog>
       </div>
 
-      {/* 6 Summary Cards (Admins only) */}
+      {/* Summary Cards (Admins only) */}
       {!isStaff && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Card 1: Available Stock - Total Cost Price */}
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-card shadow-xs">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Available Stock — Total Cost Price</p>
+                <p className="text-xs font-medium text-muted-foreground">Available Stock — MRP</p>
                 <h3 className="text-lg font-bold mt-1 text-foreground">
-                  {formatCurrency(summaryData?.total_cost_available || 0)}
+                  {formatCurrency(summaryData?.total_mrp_available || 0)}
                 </h3>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {Number(summaryData?.units_available || 0).toLocaleString()} units in stock
@@ -265,7 +284,23 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
 
-          {/* Card 2: Available Stock - Total Selling Price */}
+          <Card className="bg-card shadow-xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Available Stock — Cost Price</p>
+                <h3 className="text-lg font-bold mt-1 text-foreground">
+                  {formatCurrency(summaryData?.total_cost_available || 0)}
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_available || 0).toLocaleString()} units in stock
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                <DollarSign className="h-5 w-5" />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="bg-card shadow-xs">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
@@ -283,7 +318,6 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
 
-          {/* Card 3: Available Stock - Total Profit */}
           <Card className="bg-card shadow-xs">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
@@ -301,13 +335,12 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
 
-          {/* Card 4: Products Sold - Total Cost Price */}
           <Card className="bg-card shadow-xs">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Products Sold — Total Cost Price</p>
+                <p className="text-xs font-medium text-muted-foreground">Products Sold — MRP</p>
                 <h3 className="text-lg font-bold mt-1 text-foreground">
-                  {formatCurrency(summaryData?.total_cost_sold || 0)}
+                  {formatCurrency(summaryData?.total_mrp_sold || 0)}
                 </h3>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {Number(summaryData?.units_sold || 0).toLocaleString()} units sold
@@ -319,7 +352,23 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
 
-          {/* Card 5: Products Sold - Total Selling Price */}
+          <Card className="bg-card shadow-xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Products Sold — Cost Price</p>
+                <h3 className="text-lg font-bold mt-1 text-foreground">
+                  {formatCurrency(summaryData?.total_cost_sold || 0)}
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {Number(summaryData?.units_sold || 0).toLocaleString()} units sold
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                <ShoppingBag className="h-5 w-5" />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="bg-card shadow-xs">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
@@ -337,7 +386,6 @@ export default function ProductsPage() {
             </CardContent>
           </Card>
 
-          {/* Card 6: Products Sold - Total Profit */}
           <Card className="bg-card shadow-xs">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
@@ -464,15 +512,19 @@ export default function ProductsPage() {
                       </div>
 
                       <div className="space-y-1.5 text-xs text-muted-foreground pt-2 border-t border-border/50">
+                        <div className="flex justify-between"><span>MRP</span><span className="text-foreground font-medium">{formatCurrency(m.mrp)}</span></div>
                         {!isStaff && <div className="flex justify-between"><span>Cost Price / unit</span><span className="text-foreground font-medium">{formatCurrency(m.costPrice)}</span></div>}
                         <div className="flex justify-between"><span>Selling Price / unit</span><span className="text-foreground font-medium">{formatCurrency(m.sellingPrice)}</span></div>
+                        <div className="flex justify-between"><span>Student Discount</span><span className="text-foreground font-medium">{formatCurrency(m.studentDiscount)}</span></div>
                         <div className="flex justify-between"><span>Quantity of units</span><span className="text-foreground font-medium">{m.qtyAvailable}</span></div>
                         <div className="flex justify-between"><span>Total Selling Price</span><span className="text-foreground font-semibold">{formatCurrency(m.totalSellingPrice)}</span></div>
-                        {!isStaff && <div className="flex justify-between"><span>Profit %</span><span className="text-emerald-600 font-semibold">{m.profitPercent}%</span></div>}
                         {!isStaff && (
                           <div className="flex justify-between font-bold text-sm pt-1 border-t border-border/40">
                             <span className="text-foreground">Total Profit</span>
-                            <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(m.totalProfit)}</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              {formatCurrency(m.totalProfit)}
+                              <span className="font-semibold ml-1">({m.profitPercent}%)</span>
+                            </span>
                           </div>
                         )}
                       </div>
@@ -513,17 +565,18 @@ export default function ProductsPage() {
                   ? 'hidden'
                   : 'hidden md:block overflow-x-auto border rounded-lg'
               }>
-                <table className="w-full min-w-[1050px] text-sm">
+                <table className="w-full min-w-[1180px] text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Product Name</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Vendor Name</th>
-                      {!isStaff && <th className="px-3 py-2.5 font-medium whitespace-nowrap">Cost Price / unit</th>}
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">MRP</th>
+                      {!isStaff && <th className="px-3 py-2.5 font-medium whitespace-nowrap">Cost Price</th>}
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Selling Price / unit</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">Student Discount</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Quantity of units</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Total Selling Price</th>
                       {!isStaff && <th className="px-3 py-2.5 font-medium whitespace-nowrap">Total Profit</th>}
-                      {!isStaff && <th className="px-3 py-2.5 font-medium whitespace-nowrap">Profit %</th>}
                       <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
@@ -539,8 +592,10 @@ export default function ProductsPage() {
                             {p.sku && <div className="text-[11px] text-muted-foreground font-mono">SKU: {p.sku}</div>}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">{p.vendor_name || '—'}</td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.mrp)}</td>
                           {!isStaff && <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.costPrice)}</td>}
                           <td className="px-3 py-2.5 whitespace-nowrap font-medium">{formatCurrency(m.sellingPrice)}</td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.studentDiscount)}</td>
                           <td className="px-3 py-2.5 whitespace-nowrap font-medium">
                             <Badge variant={m.qtyAvailable > 0 ? 'secondary' : 'destructive'} className="font-mono">
                               {m.qtyAvailable}
@@ -550,11 +605,7 @@ export default function ProductsPage() {
                           {!isStaff && (
                             <td className="px-3 py-2.5 whitespace-nowrap font-bold text-emerald-600 dark:text-emerald-400">
                               {formatCurrency(m.totalProfit)}
-                            </td>
-                          )}
-                          {!isStaff && (
-                            <td className="px-3 py-2.5 whitespace-nowrap font-medium text-emerald-600">
-                              {m.profitPercent}%
+                              <span className="font-semibold ml-1">({m.profitPercent}%)</span>
                             </td>
                           )}
                           <td className="px-3 py-2.5 text-right whitespace-nowrap">
@@ -579,7 +630,7 @@ export default function ProductsPage() {
                       );
                     })}
                     {!allProducts.length && (
-                      <tr><td colSpan={9} className="py-8 text-center text-xs text-muted-foreground">No products found</td></tr>
+                      <tr><td colSpan={isStaff ? 8 : 10} className="py-8 text-center text-xs text-muted-foreground">No products found</td></tr>
                     )}
                   </tbody>
                 </table>

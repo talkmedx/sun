@@ -462,6 +462,8 @@ export default function StudentProfilePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalProductsSold = purchases?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalMrp = purchases?.reduce((sum: number, item: any) => sum + (Number(item.unit_mrp || 0) * Number(item.quantity || 0)), 0) || 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalCostPrice = purchases?.reduce((sum: number, item: any) => sum + (Number(item.unit_cost_price || 0) * Number(item.quantity || 0)), 0) || 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalSellingPrice = purchases?.reduce((sum: number, item: any) => sum + Number(item.total_amount || 0), 0) || 0;
@@ -997,7 +999,8 @@ export default function StudentProfilePage() {
 
                 <div className="p-3.5 rounded-xl bg-gradient-to-br from-card to-muted/30 border border-border/60 shadow-2xs space-y-2">
                   <div className="flex justify-between"><span className="text-muted-foreground">Products Sold</span><span className="font-semibold text-foreground">{totalProductsSold}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Total Cost Price</span><span className="font-medium">{formatCurrency(totalCostPrice)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">MRP</span><span className="font-medium">{formatCurrency(totalMrp)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Cost Price</span><span className="font-medium">{formatCurrency(totalCostPrice)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Total Selling Price</span><span className="font-medium">{formatCurrency(totalSellingPrice)}</span></div>
                   <div className="flex justify-between pt-1.5 border-t border-border/50 font-bold text-sm">
                     <span className="text-foreground">Total Profit</span>
@@ -1453,6 +1456,7 @@ export default function StudentProfilePage() {
                     {purchases?.map((p: any) => {
                       const costUnit = Number(p.unit_cost_price || 0);
                       const sellUnit = Number(p.unit_selling_price || 0);
+                      const mrpUnit = Number(p.unit_mrp || 0);
                       const qty = Number(p.quantity || 0);
                       const totalSelling = Number(p.total_amount || sellUnit * qty);
                       const totalProf = (sellUnit - costUnit) * qty;
@@ -1472,7 +1476,8 @@ export default function StudentProfilePage() {
                           </div>
 
                           <div className="space-y-1 pt-2 border-t border-border/40">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Cost Price / unit</span><span className="font-medium">{formatCurrency(costUnit)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">MRP</span><span className="font-medium">{formatCurrency(mrpUnit)}</span></div>
+                            {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Cost Price / unit</span><span className="font-medium">{formatCurrency(costUnit)}</span></div>}
                             <div className="flex justify-between"><span className="text-muted-foreground">Selling Price / unit</span><span className="font-medium">{formatCurrency(sellUnit)}</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Selling Price</span><span className="font-semibold text-foreground">{formatCurrency(totalSelling)}</span></div>
                             {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Total Profit</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</span></div>}
@@ -1521,7 +1526,8 @@ export default function StudentProfilePage() {
                           <th className="px-4 py-3 font-semibold">Product Name</th>
                           <th className="px-4 py-3 font-semibold">Date</th>
                           <th className="px-4 py-3 font-semibold">Vendor Name</th>
-                          <th className="px-4 py-3 font-semibold">Cost Price/unit</th>
+                          <th className="px-4 py-3 font-semibold">MRP</th>
+                          {!isStaff && <th className="px-4 py-3 font-semibold">Cost Price</th>}
                           <th className="px-4 py-3 font-semibold">Selling Price/unit</th>
                           <th className="px-4 py-3 font-semibold">Qty</th>
                           <th className="px-4 py-3 font-semibold">Total Selling Price</th>
@@ -1535,6 +1541,7 @@ export default function StudentProfilePage() {
                         {purchases?.map((p: any) => {
                           const costUnit = Number(p.unit_cost_price || 0);
                           const sellUnit = Number(p.unit_selling_price || 0);
+                          const mrpUnit = Number(p.unit_mrp || 0);
                           const qty = Number(p.quantity || 0);
                           const totalSelling = Number(p.total_amount || sellUnit * qty);
                           const totalProf = (sellUnit - costUnit) * qty;
@@ -1545,7 +1552,8 @@ export default function StudentProfilePage() {
                               <td className="px-4 py-3.5 font-bold text-foreground">{p.product_name}</td>
                               <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">{p.purchase_date ? formatDate(p.purchase_date) : '—'}</td>
                               <td className="px-4 py-3.5 text-muted-foreground">{p.vendor_name || '—'}</td>
-                              <td className="px-4 py-3.5">{formatCurrency(costUnit)}</td>
+                              <td className="px-4 py-3.5">{formatCurrency(mrpUnit)}</td>
+                              {!isStaff && <td className="px-4 py-3.5">{formatCurrency(costUnit)}</td>}
                               <td className="px-4 py-3.5">{formatCurrency(sellUnit)}</td>
                               <td className="px-4 py-3.5 font-semibold"><Badge variant="secondary">{p.quantity}</Badge></td>
                               <td className="px-4 py-3.5 font-semibold">{formatCurrency(totalSelling)}</td>
@@ -1573,7 +1581,7 @@ export default function StudentProfilePage() {
                           );
                         })}
                         {!purchases?.length && (
-                          <tr><td colSpan={isStaff ? 8 : 10} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
+                          <tr><td colSpan={isStaff ? 8 : 11} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
                         )}
                       </tbody>
                     </table>

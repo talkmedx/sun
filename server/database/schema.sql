@@ -294,6 +294,7 @@ CREATE TABLE products (
   name            VARCHAR(200)    NOT NULL,
   description     TEXT            NULL,
   vendor_id       BIGINT UNSIGNED NULL,
+  mrp             DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
   cost_price      DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
   selling_price   DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
   profit_percent  DECIMAL(8,2)    GENERATED ALWAYS AS (
@@ -327,6 +328,7 @@ DROP TABLE IF EXISTS product_price_history;
 CREATE TABLE product_price_history (
   id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   product_id      BIGINT UNSIGNED NOT NULL,
+  mrp             DECIMAL(12,2)   NOT NULL DEFAULT 0.00,
   cost_price      DECIMAL(12,2)   NOT NULL,
   selling_price   DECIMAL(12,2)   NOT NULL,
   effective_from  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -353,6 +355,7 @@ CREATE TABLE student_products (
   product_id      BIGINT UNSIGNED NOT NULL,
   price_history_id BIGINT UNSIGNED NULL COMMENT 'Locks the price at sale time',
   quantity        INT             NOT NULL DEFAULT 1,
+  unit_mrp        DECIMAL(12,2)   NOT NULL DEFAULT 0.00 COMMENT 'Frozen at purchase',
   unit_cost_price DECIMAL(12,2)   NOT NULL COMMENT 'Frozen at purchase',
   unit_selling_price DECIMAL(12,2) NOT NULL COMMENT 'Frozen at purchase',
   total_amount    DECIMAL(12,2)   NOT NULL,
@@ -478,6 +481,7 @@ SELECT
   p.id,
   p.sku,
   p.name,
+  p.mrp,
   p.cost_price,
   p.selling_price,
   p.profit_percent,

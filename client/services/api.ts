@@ -105,10 +105,12 @@ export const productsApi = {
     api.get<
       ApiResponse<{
         units_available: number;
+        total_mrp_available: number;
         total_cost_available: number;
         total_selling_available: number;
         total_profit_available: number;
         units_sold: number;
+        total_mrp_sold: number;
         total_cost_sold: number;
         total_selling_sold: number;
         total_profit_sold: number;

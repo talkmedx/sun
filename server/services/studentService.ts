@@ -4,6 +4,7 @@ import { NotFoundError, ConflictError, AppError } from '../utils/errors';
 import { paginate, likePattern, buildSort } from '../helpers/queryHelpers';
 import { generateStudentCode, normalizePhone } from '../helpers/generators';
 import { getFinancialYear } from '../helpers/queryHelpers';
+import { ensureProductColumns } from './productService';
 
 interface ListParams {
   page?: number;
@@ -291,8 +292,10 @@ export async function addFee(
 
 export async function listStudentProducts(studentId: number) {
   await getStudent(studentId);
+  await ensureProductColumns();
   return query<RowDataPacket[]>(
-    `SELECT sp.*, p.name AS product_name, p.sku, v.name AS vendor_name
+    `SELECT sp.*, p.name AS product_name, p.sku, v.name AS vendor_name,
+            COALESCE(NULLIF(sp.unit_mrp, 0), p.mrp, 0) AS unit_mrp
      FROM student_products sp
      JOIN products p ON p.id = sp.product_id
      LEFT JOIN vendors v ON v.id = p.vendor_id
@@ -307,6 +310,7 @@ export async function addStudentProduct(
   data: Record<string, unknown>,
   userId: number
 ) {
+  await ensureProductColumns();
   return withTransaction(async (conn) => {
     const [students] = await conn.execute<RowDataPacket[]>(
       `SELECT id FROM students WHERE id = ? AND deleted_at IS NULL`,
@@ -335,20 +339,22 @@ export async function addStudentProduct(
       [productId]
     );
     const priceRow = history[0];
+    const unitMrp = Number(priceRow?.mrp ?? product.mrp ?? 0);
     const unitCost = Number(priceRow?.cost_price ?? product.cost_price);
     const unitSell = Number(priceRow?.selling_price ?? product.selling_price);
     const total = unitSell * qty;
 
     const [result] = await conn.execute<ResultSetHeader>(
       `INSERT INTO student_products
-        (student_id, product_id, price_history_id, quantity, unit_cost_price, unit_selling_price,
+        (student_id, product_id, price_history_id, quantity, unit_mrp, unit_cost_price, unit_selling_price,
          total_amount, purchase_date, payment_mode, notes, recorded_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         studentId,
         productId,
         priceRow?.id ?? null,
         qty,
+        unitMrp,
         unitCost,
         unitSell,
         total,

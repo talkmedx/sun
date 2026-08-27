@@ -26,13 +26,14 @@ export default function ProductDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [stockType, setStockType] = useState<'add' | 'remove'>('add');
 
-  const priceForm = useForm({ defaultValues: { cost_price: '', selling_price: '', change_reason: '' } });
+  const priceForm = useForm({ defaultValues: { mrp: '', cost_price: '', selling_price: '', change_reason: '' } });
   const stockForm = useForm({ defaultValues: { quantity: '1', type: 'add' as 'add' | 'remove' } });
 
   const editForm = useForm({
     defaultValues: {
       name: '',
       vendor_id: 'none',
+      mrp: '',
       cost_price: '',
       selling_price: '',
       quantity_available: '0',
@@ -61,6 +62,7 @@ export default function ProductDetailPage() {
     editForm.reset({
       name: product.name || '',
       vendor_id: product.vendor_id ? String(product.vendor_id) : 'none',
+      mrp: String(product.mrp || ''),
       cost_price: String(product.cost_price || ''),
       selling_price: String(product.selling_price || ''),
       quantity_available: String(product.quantity_available ?? '0'),
@@ -74,6 +76,7 @@ export default function ProductDetailPage() {
     mutationFn: (v: Record<string, string>) =>
       productsApi.update(id, {
         name: v.name,
+        mrp: Number(v.mrp),
         cost_price: Number(v.cost_price),
         selling_price: Number(v.selling_price),
         quantity_available: Number(v.quantity_available || 0),
@@ -93,6 +96,7 @@ export default function ProductDetailPage() {
   const updatePrice = useMutation({
     mutationFn: (v: Record<string, string>) =>
       productsApi.update(id, {
+        mrp: Number(v.mrp),
         cost_price: Number(v.cost_price),
         selling_price: Number(v.selling_price),
         change_reason: v.change_reason,
@@ -188,14 +192,15 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label>MRP (₹) *</Label><Input type="number" step="0.01" {...editForm.register('mrp', { required: true })} /></div>
               <div className="space-y-1"><Label>Cost Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('cost_price', { required: true })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Selling Price (₹) *</Label><Input type="number" step="0.01" {...editForm.register('selling_price', { required: true })} /></div>
+              <div className="space-y-1"><Label>Quantity of units *</Label><Input type="number" {...editForm.register('quantity_available', { required: true })} /></div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Quantity of units *</Label><Input type="number" {...editForm.register('quantity_available', { required: true })} /></div>
-              <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...editForm.register('sku')} /></div>
-            </div>
+            <div className="space-y-1"><Label>SKU / Code</Label><Input placeholder="Optional" {...editForm.register('sku')} /></div>
 
             <div className="space-y-1"><Label>Description</Label><Textarea rows={2} {...editForm.register('description')} /></div>
             
@@ -207,8 +212,12 @@ export default function ProductDetailPage() {
       </Dialog>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cost Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.cost_price)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">MRP</p><p className="text-xl font-semibold">{formatCurrency(product.mrp)}</p></CardContent></Card>
+        {!isStaff && (
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cost Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.cost_price)}</p></CardContent></Card>
+        )}
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Selling Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.selling_price)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Student Discount</p><p className="text-xl font-semibold">{formatCurrency(Number(product.mrp || 0) - Number(product.selling_price || 0))}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Available Units</p><p className="text-xl font-semibold">{product.quantity_available}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Units Sold</p><p className="text-xl font-semibold">{product.quantity_sold}</p></CardContent></Card>
       </div>
@@ -244,7 +253,8 @@ export default function ProductDetailPage() {
               onSubmit={priceForm.handleSubmit((v) => updatePrice.mutate(v))}
               className="space-y-3"
             >
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1"><Label>MRP</Label><Input type="number" defaultValue={product.mrp} {...priceForm.register('mrp')} /></div>
                 <div className="space-y-1"><Label>Cost</Label><Input type="number" defaultValue={product.cost_price} {...priceForm.register('cost_price')} /></div>
                 <div className="space-y-1"><Label>Selling</Label><Input type="number" defaultValue={product.selling_price} {...priceForm.register('selling_price')} /></div>
               </div>
@@ -311,7 +321,7 @@ export default function ProductDetailPage() {
                     Sell: {formatCurrency(Number(h.selling_price))}
                   </span>
                   <span className="text-muted-foreground">
-                    Cost: {formatCurrency(Number(h.cost_price))}
+                    MRP: {formatCurrency(Number(h.mrp))} · Cost: {formatCurrency(Number(h.cost_price))}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-muted-foreground pt-1 border-t border-border/50">
@@ -338,8 +348,8 @@ export default function ProductDetailPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2">From</th><th className="pb-2">To</th><th className="pb-2">Cost</th>
-                  <th className="pb-2">Sell</th><th className="pb-2">Reason</th>
+                  <th className="pb-2">From</th><th className="pb-2">To</th><th className="pb-2">MRP</th>
+                  <th className="pb-2">Cost</th><th className="pb-2">Sell</th><th className="pb-2">Reason</th>
                 </tr>
               </thead>
               <tbody>
@@ -347,13 +357,14 @@ export default function ProductDetailPage() {
                   <tr key={String(h.id)} className="border-b border-border/50">
                     <td className="py-2">{formatDate(String(h.effective_from))}</td>
                     <td className="py-2">{h.effective_to ? formatDate(String(h.effective_to)) : 'Current'}</td>
+                    <td className="py-2">{formatCurrency(Number(h.mrp))}</td>
                     <td className="py-2">{formatCurrency(Number(h.cost_price))}</td>
                     <td className="py-2">{formatCurrency(Number(h.selling_price))}</td>
                     <td className="py-2">{String(h.change_reason || '—')}</td>
                   </tr>
                 ))}
                 {!(history as Array<Record<string, unknown>> | undefined)?.length && (
-                  <tr><td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">No price history found</td></tr>
+                  <tr><td colSpan={6} className="py-4 text-center text-xs text-muted-foreground">No price history found</td></tr>
                 )}
               </tbody>
             </table>

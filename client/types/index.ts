@@ -104,6 +104,7 @@ export interface Product {
   description?: string | null;
   vendor_id?: number | null;
   vendor_name?: string | null;
+  mrp?: number;
   cost_price: number;
   selling_price: number;
   profit_percent?: number;
