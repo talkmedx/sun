@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Plus, Search, Trash2, Pencil, LayoutGrid, List, Loader2, Package, TrendingUp, DollarSign, ShoppingBag } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, LayoutGrid, List, Loader2, Package, TrendingUp, TrendingDown, DollarSign, ShoppingBag } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { productsApi, vendorsApi } from '@/services/api';
@@ -172,6 +172,10 @@ export default function ProductsPage() {
     const totalProfit = (sellingPrice - costPrice) * qtyAvailable;
     const profitPercent = costPrice > 0 ? (((sellingPrice - costPrice) * 100) / costPrice).toFixed(1) : '0';
     const studentDiscount = mrp - sellingPrice;
+    const studentDiscountPercent = mrp > 0 ? (((mrp - sellingPrice) * 100) / mrp).toFixed(1) : '0';
+    const profitClass = totalProfit < 0
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-emerald-600 dark:text-emerald-400';
 
     return {
       mrp,
@@ -182,6 +186,8 @@ export default function ProductsPage() {
       totalProfit,
       profitPercent,
       studentDiscount,
+      studentDiscountPercent,
+      profitClass,
     };
   };
 
@@ -322,15 +328,17 @@ export default function ProductsPage() {
             <CardContent className="p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Available Stock — Total Profit</p>
-                <h3 className="text-lg font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+                <h3 className={`text-lg font-bold mt-1 ${(summaryData?.total_profit_available || 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {formatCurrency(summaryData?.total_profit_available || 0)}
                 </h3>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {Number(summaryData?.units_available || 0).toLocaleString()} units in stock
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="h-5 w-5" />
+              <div className={`p-2.5 rounded-xl ${(summaryData?.total_profit_available || 0) < 0 ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
+                {(summaryData?.total_profit_available || 0) < 0
+                  ? <TrendingDown className="h-5 w-5" />
+                  : <TrendingUp className="h-5 w-5" />}
               </div>
             </CardContent>
           </Card>
@@ -390,15 +398,17 @@ export default function ProductsPage() {
             <CardContent className="p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Products Sold — Total Profit</p>
-                <h3 className="text-lg font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+                <h3 className={`text-lg font-bold mt-1 ${(summaryData?.total_profit_sold || 0) < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {formatCurrency(summaryData?.total_profit_sold || 0)}
                 </h3>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {Number(summaryData?.units_sold || 0).toLocaleString()} units sold
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="h-5 w-5" />
+              <div className={`p-2.5 rounded-xl ${(summaryData?.total_profit_sold || 0) < 0 ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
+                {(summaryData?.total_profit_sold || 0) < 0
+                  ? <TrendingDown className="h-5 w-5" />
+                  : <TrendingUp className="h-5 w-5" />}
               </div>
             </CardContent>
           </Card>
@@ -512,16 +522,16 @@ export default function ProductsPage() {
                       </div>
 
                       <div className="space-y-1.5 text-xs text-muted-foreground pt-2 border-t border-border/50">
-                        <div className="flex justify-between"><span>MRP</span><span className="text-foreground font-medium">{formatCurrency(m.mrp)}</span></div>
                         {!isStaff && <div className="flex justify-between"><span>Cost Price / unit</span><span className="text-foreground font-medium">{formatCurrency(m.costPrice)}</span></div>}
                         <div className="flex justify-between"><span>Selling Price / unit</span><span className="text-foreground font-medium">{formatCurrency(m.sellingPrice)}</span></div>
-                        <div className="flex justify-between"><span>Student Discount</span><span className="text-foreground font-medium">{formatCurrency(m.studentDiscount)}</span></div>
+                        <div className="flex justify-between"><span>MRP</span><span className="text-foreground font-medium">{formatCurrency(m.mrp)}</span></div>
+                        <div className="flex justify-between"><span>Student Discount</span><span className="text-foreground font-medium">{formatCurrency(m.studentDiscount)} ({m.studentDiscountPercent}%)</span></div>
                         <div className="flex justify-between"><span>Quantity of units</span><span className="text-foreground font-medium">{m.qtyAvailable}</span></div>
                         <div className="flex justify-between"><span>Total Selling Price</span><span className="text-foreground font-semibold">{formatCurrency(m.totalSellingPrice)}</span></div>
                         {!isStaff && (
                           <div className="flex justify-between font-bold text-sm pt-1 border-t border-border/40">
                             <span className="text-foreground">Total Profit</span>
-                            <span className="text-emerald-600 dark:text-emerald-400">
+                            <span className={m.profitClass}>
                               {formatCurrency(m.totalProfit)}
                               <span className="font-semibold ml-1">({m.profitPercent}%)</span>
                             </span>
@@ -570,9 +580,9 @@ export default function ProductsPage() {
                     <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Product Name</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Vendor Name</th>
-                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">MRP</th>
                       {!isStaff && <th className="px-3 py-2.5 font-medium whitespace-nowrap">Cost Price</th>}
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Selling Price / unit</th>
+                      <th className="px-3 py-2.5 font-medium whitespace-nowrap">MRP</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Student Discount</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Quantity of units</th>
                       <th className="px-3 py-2.5 font-medium whitespace-nowrap">Total Selling Price</th>
@@ -592,10 +602,10 @@ export default function ProductsPage() {
                             {p.sku && <div className="text-[11px] text-muted-foreground font-mono">SKU: {p.sku}</div>}
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">{p.vendor_name || '—'}</td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.mrp)}</td>
                           {!isStaff && <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.costPrice)}</td>}
                           <td className="px-3 py-2.5 whitespace-nowrap font-medium">{formatCurrency(m.sellingPrice)}</td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.studentDiscount)}</td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.mrp)}</td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">{formatCurrency(m.studentDiscount)} ({m.studentDiscountPercent}%)</td>
                           <td className="px-3 py-2.5 whitespace-nowrap font-medium">
                             <Badge variant={m.qtyAvailable > 0 ? 'secondary' : 'destructive'} className="font-mono">
                               {m.qtyAvailable}
@@ -603,7 +613,7 @@ export default function ProductsPage() {
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap font-semibold">{formatCurrency(m.totalSellingPrice)}</td>
                           {!isStaff && (
-                            <td className="px-3 py-2.5 whitespace-nowrap font-bold text-emerald-600 dark:text-emerald-400">
+                            <td className={`px-3 py-2.5 whitespace-nowrap font-bold ${m.profitClass}`}>
                               {formatCurrency(m.totalProfit)}
                               <span className="font-semibold ml-1">({m.profitPercent}%)</span>
                             </td>

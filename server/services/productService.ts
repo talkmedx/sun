@@ -37,6 +37,25 @@ export async function ensureProductColumns() {
       // Column already exists
     }
   }
+
+  // Old cost_price values were entered as MRP. After copying them into mrp,
+  // cost was left equal to MRP, so profit (selling - cost) went negative
+  // whenever students buy below MRP.
+  try {
+    await execute(
+      `UPDATE products
+       SET cost_price = 0
+       WHERE mrp > 0 AND cost_price = mrp AND selling_price < mrp`
+    );
+    await execute(
+      `UPDATE product_price_history
+       SET cost_price = 0
+       WHERE mrp > 0 AND cost_price = mrp`
+    );
+  } catch {
+    // Ignore if cost column cannot be updated
+  }
+
   columnsEnsured = true;
 }
 

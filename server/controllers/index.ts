@@ -136,6 +136,15 @@ export const students = {
       return success(res, await studentService.listStudentProducts(Number(req.params.id)));
     } catch (e) { next(e); }
   },
+  exportProducts: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await studentService.exportStudentPurchasesPdf(
+        Number(req.params.id),
+        res,
+        req.user?.role === 'staff'
+      );
+    } catch (e) { next(e); }
+  },
   addProduct: async (req: Request, res: Response, next: NextFunction) => {
     try {
       return created(res, await studentService.addStudentProduct(Number(req.params.id), req.body, req.user!.userId));

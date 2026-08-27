@@ -41,6 +41,8 @@ export const studentsApi = {
     api.put(`/students/${id}/fees/${feeId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   deleteFee: (id: number, feeId: number) => api.delete(`/students/${id}/fees/${feeId}`),
   products: (id: number) => api.get(`/students/${id}/products`),
+  exportProductsPdf: (id: number) =>
+    api.get<Blob>(`/students/${id}/products/export`, { responseType: 'blob' }),
   addProduct: (id: number, data: unknown) => api.post(`/students/${id}/products`, data),
   updateProduct: (id: number, productId: number, data: unknown) => api.put(`/students/${id}/products/${productId}`, data),
   deleteProduct: (id: number, productId: number) => api.delete(`/students/${id}/products/${productId}`),

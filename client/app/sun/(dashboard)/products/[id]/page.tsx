@@ -217,21 +217,21 @@ export default function ProductDetailPage() {
           <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Cost Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.cost_price)}</p></CardContent></Card>
         )}
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Selling Price / unit</p><p className="text-xl font-semibold">{formatCurrency(product.selling_price)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Student Discount</p><p className="text-xl font-semibold">{formatCurrency(Number(product.mrp || 0) - Number(product.selling_price || 0))}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Student Discount</p><p className="text-xl font-semibold">{formatCurrency(Number(product.mrp || 0) - Number(product.selling_price || 0))} ({Number(product.mrp) > 0 ? (((Number(product.mrp) - Number(product.selling_price || 0)) * 100) / Number(product.mrp)).toFixed(1) : '0'}%)</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Available Units</p><p className="text-xl font-semibold">{product.quantity_available}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Units Sold</p><p className="text-xl font-semibold">{product.quantity_sold}</p></CardContent></Card>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {!isStaff && (
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit / unit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(profitPerUnit)}</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit / unit</p><p className={`text-xl font-semibold ${profitPerUnit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatCurrency(profitPerUnit)}</p></CardContent></Card>
         )}
         {!isStaff && (
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit %</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{profitPercent}%</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Profit %</p><p className={`text-xl font-semibold ${profitPerUnit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{profitPercent}%</p></CardContent></Card>
         )}
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Value</p><p className="text-xl font-semibold">{formatCurrency(stockValue)}</p></CardContent></Card>
         {!isStaff && (
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Profit</p><p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stockProfit)}</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Stock Profit</p><p className={`text-xl font-semibold ${stockProfit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatCurrency(stockProfit)}</p></CardContent></Card>
         )}
       </div>
 

@@ -93,6 +93,7 @@ router.post('/students/:id/fees', studentsOk, uploadPayment.single('screenshot')
 router.put('/students/:id/fees/:feeId', studentsOk, uploadPayment.single('screenshot'), students.updateFee);
 router.delete('/students/:id/fees/:feeId', studentsOk, students.deleteFee);
 router.get('/students/:id/products', studentsOk, students.products);
+router.get('/students/:id/products/export', studentsOk, students.exportProducts);
 router.post('/students/:id/products', studentsOk, validate(studentProductSchema), students.addProduct);
 router.put('/students/:id/products/:productId', studentsOk, students.updateProduct);
 router.delete('/students/:id/products/:productId', studentsOk, students.deleteProduct);
