@@ -1,9 +1,12 @@
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import PDFDocument from 'pdfkit';
+import { Response } from 'express';
 import { query, queryOne, execute, withTransaction } from '../config/database';
 import { NotFoundError, ConflictError, AppError } from '../utils/errors';
 import { paginate, likePattern, buildSort } from '../helpers/queryHelpers';
 import { generateStudentCode, normalizePhone } from '../helpers/generators';
 import { getFinancialYear } from '../helpers/queryHelpers';
+import { ensureProductColumns } from './productService';
 
 interface ListParams {
   page?: number;
@@ -291,8 +294,10 @@ export async function addFee(
 
 export async function listStudentProducts(studentId: number) {
   await getStudent(studentId);
+  await ensureProductColumns();
   return query<RowDataPacket[]>(
-    `SELECT sp.*, p.name AS product_name, p.sku, v.name AS vendor_name
+    `SELECT sp.*, p.name AS product_name, p.sku, v.name AS vendor_name,
+            COALESCE(NULLIF(sp.unit_mrp, 0), p.mrp, 0) AS unit_mrp
      FROM student_products sp
      JOIN products p ON p.id = sp.product_id
      LEFT JOIN vendors v ON v.id = p.vendor_id
@@ -307,6 +312,7 @@ export async function addStudentProduct(
   data: Record<string, unknown>,
   userId: number
 ) {
+  await ensureProductColumns();
   return withTransaction(async (conn) => {
     const [students] = await conn.execute<RowDataPacket[]>(
       `SELECT id FROM students WHERE id = ? AND deleted_at IS NULL`,
@@ -335,20 +341,22 @@ export async function addStudentProduct(
       [productId]
     );
     const priceRow = history[0];
+    const unitMrp = Number(priceRow?.mrp ?? product.mrp ?? 0);
     const unitCost = Number(priceRow?.cost_price ?? product.cost_price);
     const unitSell = Number(priceRow?.selling_price ?? product.selling_price);
     const total = unitSell * qty;
 
     const [result] = await conn.execute<ResultSetHeader>(
       `INSERT INTO student_products
-        (student_id, product_id, price_history_id, quantity, unit_cost_price, unit_selling_price,
+        (student_id, product_id, price_history_id, quantity, unit_mrp, unit_cost_price, unit_selling_price,
          total_amount, purchase_date, payment_mode, notes, recorded_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         studentId,
         productId,
         priceRow?.id ?? null,
         qty,
+        unitMrp,
         unitCost,
         unitSell,
         total,
@@ -626,4 +634,241 @@ export async function deleteStudentProduct(studentId: number, spId: number) {
       [qty, qty, sp.product_id]
     );
   });
+}
+
+function pdfInr(n: number) {
+  return `Rs ${new Intl.NumberFormat('en-IN').format(Math.round(n))}`;
+}
+
+function pdfDate(value: unknown) {
+  if (!value) return '—';
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+export async function exportStudentPurchasesPdf(
+  studentId: number,
+  res: Response,
+  hideCostAndProfit: boolean
+) {
+  const student = await getStudent(studentId);
+  const purchases = await listStudentProducts(studentId);
+
+  const studentName = [student.first_name, student.last_name].filter(Boolean).join(' ').trim();
+  const safeName = (studentName || 'student').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
+
+  const doc = new PDFDocument({
+    margin: 32,
+    size: 'A4',
+    layout: 'landscape',
+    bufferPages: true,
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}-product-purchases.pdf"`);
+  doc.pipe(res);
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor('#111827')
+    .text("Komal's Makeovers");
+  doc.font('Helvetica-Bold').fontSize(12)
+    .text('Product Purchases');
+  doc.moveDown(0.25);
+  doc.font('Helvetica').fontSize(9).fillColor('#4b5563');
+  doc.text(`Student: ${studentName}${student.student_code ? `  (${student.student_code})` : ''}`);
+  if (student.batch_name) doc.text(`Batch: ${student.batch_name}`);
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`);
+  doc.moveDown(0.55);
+
+  type Col = { key: string; label: string; width: number; wrap?: boolean; align?: 'left' | 'right' };
+
+  const columns: Col[] = hideCostAndProfit
+    ? [
+        { key: 'product', label: 'PRODUCT NAME', width: 0.22, wrap: true },
+        { key: 'date', label: 'DATE', width: 0.09 },
+        { key: 'vendor', label: 'VENDOR NAME', width: 0.16, wrap: true },
+        { key: 'selling', label: 'SELLING PRICE/UNIT', width: 0.12, align: 'right' },
+        { key: 'mrp', label: 'MRP', width: 0.09, align: 'right' },
+        { key: 'discount', label: 'STUDENT DISCOUNT', width: 0.14, align: 'right' },
+        { key: 'qty', label: 'QTY', width: 0.05, align: 'right' },
+        { key: 'total', label: 'TOTAL SELLING PRICE', width: 0.13, align: 'right' },
+      ]
+    : [
+        { key: 'product', label: 'PRODUCT NAME', width: 0.16, wrap: true },
+        { key: 'date', label: 'DATE', width: 0.075 },
+        { key: 'vendor', label: 'VENDOR NAME', width: 0.12, wrap: true },
+        { key: 'cost', label: 'COST PRICE', width: 0.085, align: 'right' },
+        { key: 'selling', label: 'SELLING / UNIT', width: 0.095, align: 'right' },
+        { key: 'mrp', label: 'MRP', width: 0.075, align: 'right' },
+        { key: 'discount', label: 'STUDENT DISCOUNT', width: 0.13, align: 'right' },
+        { key: 'qty', label: 'QTY', width: 0.04, align: 'right' },
+        { key: 'total', label: 'TOTAL SELLING', width: 0.1, align: 'right' },
+        { key: 'profit', label: 'TOTAL PROFIT', width: 0.125, align: 'right' },
+      ];
+
+  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const weightSum = columns.reduce((s, c) => s + c.width, 0);
+  const colWidths = columns.map((c) => (c.width / weightSum) * pageWidth);
+  const startX = doc.page.margins.left;
+  const rowPad = 5;
+  const minRowH = 22;
+  const headerH = 24;
+  const numericKeys = new Set(['cost', 'selling', 'mrp', 'discount', 'qty', 'total', 'profit']);
+
+  function rowValues(p: RowDataPacket): string[] {
+    const costUnit = Number(p.unit_cost_price || 0);
+    const sellUnit = Number(p.unit_selling_price || 0);
+    const mrpUnit = Number(p.unit_mrp || 0);
+    const qty = Number(p.quantity || 0);
+    const totalSelling = Number(p.total_amount || sellUnit * qty);
+    const totalProf = (sellUnit - costUnit) * qty;
+    const profPct = costUnit > 0 ? (((sellUnit - costUnit) * 100) / costUnit).toFixed(1) : '0.0';
+    const discAmt = (mrpUnit - sellUnit) * qty;
+    const discPct = mrpUnit > 0 ? (((mrpUnit - sellUnit) * 100) / mrpUnit).toFixed(1) : '0.0';
+    const map: Record<string, string> = {
+      product: String(p.product_name || '—'),
+      date: pdfDate(p.purchase_date),
+      vendor: String(p.vendor_name || '—'),
+      cost: pdfInr(costUnit),
+      selling: pdfInr(sellUnit),
+      mrp: pdfInr(mrpUnit),
+      discount: `${pdfInr(discAmt)} (${discPct}%)`,
+      qty: String(qty),
+      total: pdfInr(totalSelling),
+      profit: `${pdfInr(totalProf)} (${profPct}%)`,
+    };
+    return columns.map((c) => map[c.key]);
+  }
+
+  let y = doc.y;
+
+  function pageBottom() {
+    return doc.page.height - doc.page.margins.bottom - 16;
+  }
+
+  function drawHeader() {
+    doc.rect(startX, y, pageWidth, headerH).fill('#f3f4f6');
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#374151');
+    let x = startX;
+    columns.forEach((col, i) => {
+      doc.text(col.label, x + 4, y + 8, {
+        width: colWidths[i] - 8,
+        lineBreak: false,
+        ellipsis: true,
+        align: col.align === 'right' ? 'right' : 'left',
+      });
+      x += colWidths[i];
+    });
+    y += headerH;
+    doc.fillColor('#111827');
+  }
+
+  function ensureSpace(h: number) {
+    if (y + h <= pageBottom()) return;
+    doc.addPage({ size: 'A4', layout: 'landscape', margin: 32 });
+    y = doc.page.margins.top;
+    drawHeader();
+  }
+
+  drawHeader();
+
+  if (!purchases.length) {
+    ensureSpace(36);
+    doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
+      .text('No products purchased', startX, y + 12, { width: pageWidth, align: 'center' });
+    y += 36;
+  } else {
+    purchases.forEach((p, idx) => {
+      const values = rowValues(p);
+      doc.font('Helvetica').fontSize(8);
+      const heights = values.map((v, i) => {
+        if (!columns[i].wrap) return minRowH;
+        return Math.max(minRowH, doc.heightOfString(v, { width: colWidths[i] - 8 }) + rowPad * 2);
+      });
+      const h = Math.max(...heights);
+      ensureSpace(h);
+
+      if (idx % 2 === 1) {
+        doc.rect(startX, y, pageWidth, h).fill('#fafafa');
+      }
+
+      let x = startX;
+      values.forEach((v, i) => {
+        const isProduct = columns[i].key === 'product';
+        doc.font(isProduct ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).fillColor('#111827');
+        doc.text(v, x + 4, y + rowPad, {
+          width: colWidths[i] - 8,
+          align: columns[i].align === 'right' ? 'right' : 'left',
+          lineBreak: Boolean(columns[i].wrap),
+          ellipsis: !columns[i].wrap,
+          height: h - rowPad,
+        });
+        x += colWidths[i];
+      });
+
+      y += h;
+      doc.strokeColor('#e5e7eb').lineWidth(0.5)
+        .moveTo(startX, y).lineTo(startX + pageWidth, y).stroke();
+    });
+
+    const totals = purchases.reduce(
+      (acc, p) => {
+        const costUnit = Number(p.unit_cost_price || 0);
+        const sellUnit = Number(p.unit_selling_price || 0);
+        const mrpUnit = Number(p.unit_mrp || 0);
+        const qty = Number(p.quantity || 0);
+        const totalSelling = Number(p.total_amount || sellUnit * qty);
+        acc.qty += qty;
+        acc.selling += totalSelling;
+        acc.profit += (sellUnit - costUnit) * qty;
+        acc.discount += (mrpUnit - sellUnit) * qty;
+        return acc;
+      },
+      { qty: 0, selling: 0, profit: 0, discount: 0 }
+    );
+
+    const totalH = 24;
+    ensureSpace(totalH);
+    doc.rect(startX, y, pageWidth, totalH).fill('#f3f4f6');
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#111827');
+
+    const totalMap: Record<string, string> = {
+      product: 'TOTAL',
+      discount: pdfInr(totals.discount),
+      qty: String(totals.qty),
+      total: pdfInr(totals.selling),
+      profit: pdfInr(totals.profit),
+    };
+
+    let tx = startX;
+    columns.forEach((col, i) => {
+      const label = totalMap[col.key];
+      if (label) {
+        doc.text(label, tx + 4, y + 8, {
+          width: colWidths[i] - 8,
+          align: numericKeys.has(col.key) ? 'right' : 'left',
+          lineBreak: false,
+        });
+      }
+      tx += colWidths[i];
+    });
+    y += totalH;
+  }
+
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(7).fillColor('#9ca3af');
+    doc.text(
+      `Page ${i + 1} of ${range.count}`,
+      startX,
+      doc.page.height - 24,
+      { width: pageWidth, align: 'right', lineBreak: false }
+    );
+    doc.page.margins.bottom = savedBottom;
+  }
+
+  doc.end();
 }

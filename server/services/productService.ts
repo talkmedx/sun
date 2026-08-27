@@ -12,7 +12,55 @@ interface ListParams {
   stock_status?: 'available' | 'out_of_stock' | 'all';
 }
 
+let columnsEnsured = false;
+export async function ensureProductColumns() {
+  if (columnsEnsured) return;
+  const alters: { sql: string; backfill?: string }[] = [
+    {
+      sql: 'ALTER TABLE products ADD COLUMN mrp DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+      backfill: 'UPDATE products SET mrp = cost_price WHERE mrp = 0',
+    },
+    {
+      sql: 'ALTER TABLE product_price_history ADD COLUMN mrp DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+      backfill: 'UPDATE product_price_history SET mrp = cost_price WHERE mrp = 0',
+    },
+    {
+      sql: 'ALTER TABLE student_products ADD COLUMN unit_mrp DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+      backfill: 'UPDATE student_products SET unit_mrp = unit_cost_price WHERE unit_mrp = 0',
+    },
+  ];
+  for (const { sql, backfill } of alters) {
+    try {
+      await execute(sql);
+      if (backfill) await execute(backfill);
+    } catch {
+      // Column already exists
+    }
+  }
+
+  // Old cost_price values were entered as MRP. After copying them into mrp,
+  // cost was left equal to MRP, so profit (selling - cost) went negative
+  // whenever students buy below MRP.
+  try {
+    await execute(
+      `UPDATE products
+       SET cost_price = 0
+       WHERE mrp > 0 AND cost_price = mrp AND selling_price < mrp`
+    );
+    await execute(
+      `UPDATE product_price_history
+       SET cost_price = 0
+       WHERE mrp > 0 AND cost_price = mrp`
+    );
+  } catch {
+    // Ignore if cost column cannot be updated
+  }
+
+  columnsEnsured = true;
+}
+
 export async function listProducts(params: ListParams) {
+  await ensureProductColumns();
   const { page, limit, offset } = paginate(params.page, params.limit);
   const conditions = ['p.deleted_at IS NULL'];
   const q: Record<string, unknown> = {};
@@ -57,9 +105,11 @@ export async function listProducts(params: ListParams) {
 }
 
 export async function getProductSummary() {
+  await ensureProductColumns();
   const stockSummary = await queryOne<RowDataPacket>(
     `SELECT
        COALESCE(SUM(quantity_available), 0) AS units_available,
+       COALESCE(SUM(quantity_available * mrp), 0) AS total_mrp_available,
        COALESCE(SUM(quantity_available * cost_price), 0) AS total_cost_available,
        COALESCE(SUM(quantity_available * selling_price), 0) AS total_selling_available,
        COALESCE(SUM(quantity_available * (selling_price - cost_price)), 0) AS total_profit_available
@@ -70,6 +120,7 @@ export async function getProductSummary() {
   const salesSummary = await queryOne<RowDataPacket>(
     `SELECT
        COALESCE(SUM(quantity), 0) AS units_sold,
+       COALESCE(SUM(quantity * unit_mrp), 0) AS total_mrp_sold,
        COALESCE(SUM(quantity * unit_cost_price), 0) AS total_cost_sold,
        COALESCE(SUM(total_amount), 0) AS total_selling_sold,
        COALESCE(SUM(total_amount - (quantity * unit_cost_price)), 0) AS total_profit_sold
@@ -79,10 +130,12 @@ export async function getProductSummary() {
 
   return {
     units_available: Number(stockSummary?.units_available || 0),
+    total_mrp_available: Number(stockSummary?.total_mrp_available || 0),
     total_cost_available: Number(stockSummary?.total_cost_available || 0),
     total_selling_available: Number(stockSummary?.total_selling_available || 0),
     total_profit_available: Number(stockSummary?.total_profit_available || 0),
     units_sold: Number(salesSummary?.units_sold || 0),
+    total_mrp_sold: Number(salesSummary?.total_mrp_sold || 0),
     total_cost_sold: Number(salesSummary?.total_cost_sold || 0),
     total_selling_sold: Number(salesSummary?.total_selling_sold || 0),
     total_profit_sold: Number(salesSummary?.total_profit_sold || 0),
@@ -90,6 +143,7 @@ export async function getProductSummary() {
 }
 
 export async function getProduct(id: number) {
+  await ensureProductColumns();
   const product = await queryOne<RowDataPacket>(
     `SELECT p.*, v.name AS vendor_name
      FROM products p
@@ -102,6 +156,7 @@ export async function getProduct(id: number) {
 }
 
 export async function createProduct(data: Record<string, unknown>, userId: number) {
+  await ensureProductColumns();
   const dup = await queryOne<RowDataPacket>(
     `SELECT id FROM products WHERE name = :name AND deleted_at IS NULL`,
     { name: data.name }
@@ -119,14 +174,15 @@ export async function createProduct(data: Record<string, unknown>, userId: numbe
   return withTransaction(async (conn) => {
     const [result] = await conn.execute<ResultSetHeader>(
       `INSERT INTO products
-        (sku, name, description, vendor_id, cost_price, selling_price, quantity_available,
+        (sku, name, description, vendor_id, mrp, cost_price, selling_price, quantity_available,
          low_stock_threshold, is_active, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         (data.sku as string) || null,
         data.name as string,
         (data.description as string) || null,
         (data.vendor_id as number) || null,
+        Number(data.mrp ?? 0),
         data.cost_price as number,
         data.selling_price as number,
         (data.quantity_available as number) ?? 0,
@@ -139,9 +195,9 @@ export async function createProduct(data: Record<string, unknown>, userId: numbe
     // Initial price history row
     await conn.execute(
       `INSERT INTO product_price_history
-        (product_id, cost_price, selling_price, effective_from, effective_to, changed_by, change_reason)
-       VALUES (?, ?, ?, NOW(), NULL, ?, 'Initial pricing')`,
-      [result.insertId, Number(data.cost_price), Number(data.selling_price), userId]
+        (product_id, mrp, cost_price, selling_price, effective_from, effective_to, changed_by, change_reason)
+       VALUES (?, ?, ?, ?, NOW(), NULL, ?, 'Initial pricing')`,
+      [result.insertId, Number(data.mrp ?? 0), Number(data.cost_price), Number(data.selling_price), userId]
     );
 
     const [rows] = await conn.execute<RowDataPacket[]>(
@@ -153,6 +209,7 @@ export async function createProduct(data: Record<string, unknown>, userId: numbe
 }
 
 export async function updateProduct(id: number, data: Record<string, unknown>, userId: number) {
+  await ensureProductColumns();
   const product = await getProduct(id);
 
   if (data.name) {
@@ -164,6 +221,8 @@ export async function updateProduct(id: number, data: Record<string, unknown>, u
   }
 
   return withTransaction(async (conn) => {
+    const mrpChanged =
+      data.mrp !== undefined && Number(data.mrp) !== Number(product.mrp);
     const costChanged =
       data.cost_price !== undefined && Number(data.cost_price) !== Number(product.cost_price);
     const sellChanged =
@@ -171,7 +230,7 @@ export async function updateProduct(id: number, data: Record<string, unknown>, u
       Number(data.selling_price) !== Number(product.selling_price);
 
     const fields = [
-      'sku', 'name', 'description', 'vendor_id', 'cost_price', 'selling_price',
+      'sku', 'name', 'description', 'vendor_id', 'mrp', 'cost_price', 'selling_price',
       'quantity_available', 'low_stock_threshold', 'is_active',
     ];
     const sets: string[] = [];
@@ -191,7 +250,8 @@ export async function updateProduct(id: number, data: Record<string, unknown>, u
     }
 
     // Never mutate historical price rows — close old, insert new
-    if (costChanged || sellChanged) {
+    if (mrpChanged || costChanged || sellChanged) {
+      const newMrp = data.mrp !== undefined ? Number(data.mrp) : Number(product.mrp || 0);
       const newCost = data.cost_price !== undefined ? Number(data.cost_price) : Number(product.cost_price);
       const newSell =
         data.selling_price !== undefined ? Number(data.selling_price) : Number(product.selling_price);
@@ -205,9 +265,9 @@ export async function updateProduct(id: number, data: Record<string, unknown>, u
 
       await conn.execute(
         `INSERT INTO product_price_history
-          (product_id, cost_price, selling_price, effective_from, effective_to, changed_by, change_reason)
-         VALUES (?, ?, ?, NOW(), NULL, ?, ?)`,
-        [id, newCost, newSell, userId, (data as { change_reason?: string }).change_reason || 'Price update']
+          (product_id, mrp, cost_price, selling_price, effective_from, effective_to, changed_by, change_reason)
+         VALUES (?, ?, ?, ?, NOW(), NULL, ?, ?)`,
+        [id, newMrp, newCost, newSell, userId, (data as { change_reason?: string }).change_reason || 'Price update']
       );
     }
 
@@ -237,6 +297,7 @@ export async function deleteProduct(id: number) {
 }
 
 export async function getPriceHistory(productId: number) {
+  await ensureProductColumns();
   await getProduct(productId);
   return query<RowDataPacket[]>(
     `SELECT pph.*, u.name AS changed_by_name

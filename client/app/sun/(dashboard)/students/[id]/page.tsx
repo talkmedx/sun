@@ -8,7 +8,7 @@ import Link from 'next/link';
 import {
   LayoutGrid, List, Pencil, Trash2, FileText, Plus, Camera, Image as ImageIcon,
   ArrowLeft, Phone, Mail, Calendar, MapPin, Briefcase, GraduationCap,
-  Wallet, ShoppingBag, TrendingUp, CreditCard, Building, User, Sparkles, CheckCircle2
+  Wallet, ShoppingBag, TrendingUp, CreditCard, Building, User, Sparkles, CheckCircle2, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { studentsApi, productsApi, batchesApi, vendorsApi } from '@/services/api';
@@ -32,6 +32,7 @@ export default function StudentProfilePage() {
   const isStaff = useAuthStore((s) => s.user?.role) === 'staff';
   const [tab, setTab] = useState<'fees' | 'products' | 'documents'>('fees');
   const [viewMode, setViewMode] = useState<'auto' | 'grid' | 'table'>('table');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Searchable Product Dropdown State
   const [productSearch, setProductSearch] = useState('');
@@ -394,6 +395,33 @@ export default function StudentProfilePage() {
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
+  async function downloadPurchasesPdf() {
+    try {
+      setDownloadingPdf(true);
+      const res = await studentsApi.exportProductsPdf(id);
+      const blob = res.data instanceof Blob
+        ? res.data
+        : new Blob([res.data], { type: 'application/pdf' });
+      if (blob.type && blob.type.includes('json')) {
+        toast.error('Could not download PDF');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const name = formatFullName(student?.first_name, student?.last_name).replace(/[^\w]+/g, '_') || 'student';
+      a.download = `${name}-product-purchases.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(getErrorMessage(err) || 'Could not download PDF');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   const handleEditStudentClick = () => {
     if (!student) return;
     editStudentForm.reset({
@@ -462,11 +490,15 @@ export default function StudentProfilePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalProductsSold = purchases?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0) || 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalMrp = purchases?.reduce((sum: number, item: any) => sum + (Number(item.unit_mrp || 0) * Number(item.quantity || 0)), 0) || 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalCostPrice = purchases?.reduce((sum: number, item: any) => sum + (Number(item.unit_cost_price || 0) * Number(item.quantity || 0)), 0) || 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalSellingPrice = purchases?.reduce((sum: number, item: any) => sum + Number(item.total_amount || 0), 0) || 0;
   const totalProfit = totalSellingPrice - totalCostPrice;
   const totalProfitPercent = totalCostPrice > 0 ? ((totalProfit * 100) / totalCostPrice).toFixed(1) : '0';
+  const totalStudentDiscount = totalMrp - totalSellingPrice;
+  const totalStudentDiscountPercent = totalMrp > 0 ? ((totalStudentDiscount * 100) / totalMrp).toFixed(1) : '0';
 
   return (
     <div className="space-y-6">
@@ -984,28 +1016,43 @@ export default function StudentProfilePage() {
                 </div>
               </div>
 
-              {!isStaff && (
               <div className="w-full pt-2 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-primary" /> Product Profits
                   </span>
-                  <Badge variant="outline" className="text-[11px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold bg-emerald-500/5">
-                    +{totalProfitPercent}% profit
-                  </Badge>
+                  {!isStaff && (
+                    <Badge variant="outline" className="text-[11px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold bg-emerald-500/5">
+                      +{totalProfitPercent}% profit
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-gradient-to-br from-card to-muted/30 border border-border/60 shadow-2xs space-y-2">
                   <div className="flex justify-between"><span className="text-muted-foreground">Products Sold</span><span className="font-semibold text-foreground">{totalProductsSold}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Total Cost Price</span><span className="font-medium">{formatCurrency(totalCostPrice)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Total Selling Price</span><span className="font-medium">{formatCurrency(totalSellingPrice)}</span></div>
-                  <div className="flex justify-between pt-1.5 border-t border-border/50 font-bold text-sm">
-                    <span className="text-foreground">Total Profit</span>
-                    <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProfit)}</span>
-                  </div>
+                  {isStaff ? (
+                    <>
+                      <div className="flex justify-between"><span className="text-muted-foreground">MRP</span><span className="font-medium">{formatCurrency(totalMrp)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Student Discount</span><span className="font-medium">{formatCurrency(totalStudentDiscount)} ({totalStudentDiscountPercent}%)</span></div>
+                      <div className="flex justify-between pt-1.5 border-t border-border/50 font-bold text-sm">
+                        <span className="text-foreground">Total Selling Price</span>
+                        <span className="text-foreground">{formatCurrency(totalSellingPrice)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Cost Price</span><span className="font-medium">{formatCurrency(totalCostPrice)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Total Selling Price</span><span className="font-medium">{formatCurrency(totalSellingPrice)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">MRP</span><span className="font-medium">{formatCurrency(totalMrp)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Student Discount</span><span className="font-medium">{formatCurrency(totalStudentDiscount)} ({totalStudentDiscountPercent}%)</span></div>
+                      <div className="flex justify-between pt-1.5 border-t border-border/50 font-bold text-sm">
+                        <span className="text-foreground">Total Profit</span>
+                        <span className={totalProfit < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>{formatCurrency(totalProfit)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -1419,25 +1466,38 @@ export default function StudentProfilePage() {
                       {isStaff ? 'Purchased items' : 'Purchased items and profit calculations'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/20">
+                  <div className="flex items-center gap-2">
                     <Button
-                      variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                      size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8"
-                      title="Grid view"
-                      onClick={() => setViewMode('grid')}
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      title="Download PDF"
+                      onClick={downloadPurchasesPdf}
+                      disabled={downloadingPdf}
                     >
-                      <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <Download className="h-3.5 w-3.5 sm:mr-1.5" />
+                      <span className="hidden sm:inline">{downloadingPdf ? 'Downloading…' : 'Download PDF'}</span>
                     </Button>
-                    <Button
-                      variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                      size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8"
-                      title="Table view"
-                      onClick={() => setViewMode('table')}
-                    >
-                      <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/20">
+                      <Button
+                        variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                        size="icon"
+                        className="h-7 w-7 sm:h-8 sm:w-8"
+                        title="Grid view"
+                        onClick={() => setViewMode('grid')}
+                      >
+                        <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                        size="icon"
+                        className="h-7 w-7 sm:h-8 sm:w-8"
+                        title="Table view"
+                        onClick={() => setViewMode('table')}
+                      >
+                        <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6 pt-0">
@@ -1453,6 +1513,7 @@ export default function StudentProfilePage() {
                     {purchases?.map((p: any) => {
                       const costUnit = Number(p.unit_cost_price || 0);
                       const sellUnit = Number(p.unit_selling_price || 0);
+                      const mrpUnit = Number(p.unit_mrp || 0);
                       const qty = Number(p.quantity || 0);
                       const totalSelling = Number(p.total_amount || sellUnit * qty);
                       const totalProf = (sellUnit - costUnit) * qty;
@@ -1472,11 +1533,19 @@ export default function StudentProfilePage() {
                           </div>
 
                           <div className="space-y-1 pt-2 border-t border-border/40">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Cost Price / unit</span><span className="font-medium">{formatCurrency(costUnit)}</span></div>
+                            {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Cost Price / unit</span><span className="font-medium">{formatCurrency(costUnit)}</span></div>}
                             <div className="flex justify-between"><span className="text-muted-foreground">Selling Price / unit</span><span className="font-medium">{formatCurrency(sellUnit)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">MRP</span><span className="font-medium">{formatCurrency(mrpUnit)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Student Discount</span><span className="font-medium">{formatCurrency((mrpUnit - sellUnit) * qty)} ({mrpUnit > 0 ? (((mrpUnit - sellUnit) * 100) / mrpUnit).toFixed(1) : '0'}%)</span></div>
                             <div className="flex justify-between"><span className="text-muted-foreground">Total Selling Price</span><span className="font-semibold text-foreground">{formatCurrency(totalSelling)}</span></div>
-                            {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Total Profit</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</span></div>}
-                            {!isStaff && <div className="flex justify-between"><span className="text-muted-foreground">Profit %</span><span className="font-bold text-emerald-600 dark:text-emerald-400">{profPct}%</span></div>}
+                            {!isStaff && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total Profit</span>
+                                <span className={`font-bold ${totalProf < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {formatCurrency(totalProf)} ({profPct}%)
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex gap-2 pt-2 border-t border-border/50">
@@ -1521,12 +1590,13 @@ export default function StudentProfilePage() {
                           <th className="px-4 py-3 font-semibold">Product Name</th>
                           <th className="px-4 py-3 font-semibold">Date</th>
                           <th className="px-4 py-3 font-semibold">Vendor Name</th>
-                          <th className="px-4 py-3 font-semibold">Cost Price/unit</th>
+                          {!isStaff && <th className="px-4 py-3 font-semibold">Cost Price</th>}
                           <th className="px-4 py-3 font-semibold">Selling Price/unit</th>
+                          <th className="px-4 py-3 font-semibold">MRP</th>
+                          <th className="px-4 py-3 font-semibold">Student Discount</th>
                           <th className="px-4 py-3 font-semibold">Qty</th>
                           <th className="px-4 py-3 font-semibold">Total Selling Price</th>
                           {!isStaff && <th className="px-4 py-3 font-semibold">Total Profit</th>}
-                          {!isStaff && <th className="px-4 py-3 font-semibold">Profit %</th>}
                           <th className="px-4 py-3 font-semibold text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1535,6 +1605,7 @@ export default function StudentProfilePage() {
                         {purchases?.map((p: any) => {
                           const costUnit = Number(p.unit_cost_price || 0);
                           const sellUnit = Number(p.unit_selling_price || 0);
+                          const mrpUnit = Number(p.unit_mrp || 0);
                           const qty = Number(p.quantity || 0);
                           const totalSelling = Number(p.total_amount || sellUnit * qty);
                           const totalProf = (sellUnit - costUnit) * qty;
@@ -1545,12 +1616,17 @@ export default function StudentProfilePage() {
                               <td className="px-4 py-3.5 font-bold text-foreground">{p.product_name}</td>
                               <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">{p.purchase_date ? formatDate(p.purchase_date) : '—'}</td>
                               <td className="px-4 py-3.5 text-muted-foreground">{p.vendor_name || '—'}</td>
-                              <td className="px-4 py-3.5">{formatCurrency(costUnit)}</td>
+                              {!isStaff && <td className="px-4 py-3.5">{formatCurrency(costUnit)}</td>}
                               <td className="px-4 py-3.5">{formatCurrency(sellUnit)}</td>
+                              <td className="px-4 py-3.5">{formatCurrency(mrpUnit)}</td>
+                              <td className="px-4 py-3.5">{formatCurrency((mrpUnit - sellUnit) * qty)} ({mrpUnit > 0 ? (((mrpUnit - sellUnit) * 100) / mrpUnit).toFixed(1) : '0'}%)</td>
                               <td className="px-4 py-3.5 font-semibold"><Badge variant="secondary">{p.quantity}</Badge></td>
                               <td className="px-4 py-3.5 font-semibold">{formatCurrency(totalSelling)}</td>
-                              {!isStaff && <td className="px-4 py-3.5 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalProf)}</td>}
-                              {!isStaff && <td className="px-4 py-3.5 font-bold text-emerald-600 dark:text-emerald-400">{profPct}%</td>}
+                              {!isStaff && (
+                                <td className={`px-4 py-3.5 font-bold ${totalProf < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {formatCurrency(totalProf)} ({profPct}%)
+                                </td>
+                              )}
                               <td className="px-4 py-3.5 text-right">
                                 <div className="flex items-center justify-end gap-1">
                                   <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit purchase" onClick={() => handleEditProductClick(p)}>
@@ -1573,7 +1649,7 @@ export default function StudentProfilePage() {
                           );
                         })}
                         {!purchases?.length && (
-                          <tr><td colSpan={isStaff ? 8 : 10} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
+                          <tr><td colSpan={isStaff ? 9 : 11} className="py-8 text-center text-xs text-muted-foreground">No products purchased</td></tr>
                         )}
                       </tbody>
                     </table>

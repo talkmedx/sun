@@ -4,6 +4,7 @@ import { testConnection } from './config/database';
 import { ensureDefaultAdmin } from './services/authService';
 import { ensureDefaultStaff } from './services/usersService';
 import { logDriveStatus } from './services/googleDriveService';
+import { ensureProductColumns } from './services/productService';
 
 async function bootstrap() {
   const dbOk = await testConnection();
@@ -16,6 +17,7 @@ async function bootstrap() {
     try {
       await ensureDefaultAdmin();
       await ensureDefaultStaff();
+      await ensureProductColumns();
       console.log('✅ Default admin ready (admin@komalsmakeovers.com / Admin@123)');
       console.log('✅ Default staff ready (staff@komalsmakeovers.com / Staff@123)');
       await logDriveStatus();

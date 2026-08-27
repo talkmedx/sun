@@ -68,26 +68,26 @@ INSERT INTO vendor_credits (vendor_id, amount, type, expense_id, description, tr
 (1, 25000.00, 'credit_used', 1, 'Makeup kits for Batch A', '2025-04-02', 1),
 (2, 8500.00, 'credit_added', NULL, 'Advance payment', '2025-06-01', 1);
 
-INSERT INTO products (sku, name, description, vendor_id, cost_price, selling_price, quantity_available, quantity_sold, created_by) VALUES
-('PRD-001', 'HD Foundation Kit', 'Professional HD foundation set', 1, 800.00, 1200.00, 45, 5, 1),
-('PRD-002', 'Bridal Lipstick Set', 'Long-lasting bridal lipstick pack', 2, 450.00, 750.00, 30, 10, 1),
-('PRD-003', 'Makeup Brush Set Pro', '12-piece professional brush set', 3, 1200.00, 1999.00, 20, 3, 1),
-('PRD-004', 'Setting Spray', 'Long wear setting spray 100ml', 1, 250.00, 450.00, 60, 15, 1),
-('PRD-005', 'Contour Palette', 'Cream contour & highlight palette', 2, 600.00, 999.00, 25, 0, 1);
+INSERT INTO products (sku, name, description, vendor_id, mrp, cost_price, selling_price, quantity_available, quantity_sold, created_by) VALUES
+('PRD-001', 'HD Foundation Kit', 'Professional HD foundation set', 1, 1500.00, 800.00, 1200.00, 45, 5, 1),
+('PRD-002', 'Bridal Lipstick Set', 'Long-lasting bridal lipstick pack', 2, 999.00, 450.00, 750.00, 30, 10, 1),
+('PRD-003', 'Makeup Brush Set Pro', '12-piece professional brush set', 3, 2499.00, 1200.00, 1999.00, 20, 3, 1),
+('PRD-004', 'Setting Spray', 'Long wear setting spray 100ml', 1, 599.00, 250.00, 450.00, 60, 15, 1),
+('PRD-005', 'Contour Palette', 'Cream contour & highlight palette', 2, 1299.00, 600.00, 999.00, 25, 0, 1);
 
-INSERT INTO product_price_history (product_id, cost_price, selling_price, effective_from, effective_to, changed_by, change_reason) VALUES
-(1, 750.00, 1100.00, '2025-01-01 00:00:00', '2025-06-01 00:00:00', 1, 'Initial pricing'),
-(1, 800.00, 1200.00, '2025-06-01 00:00:00', NULL, 1, 'Price increase'),
-(2, 450.00, 750.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing'),
-(3, 1200.00, 1999.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing'),
-(4, 250.00, 450.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing'),
-(5, 600.00, 999.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing');
+INSERT INTO product_price_history (product_id, mrp, cost_price, selling_price, effective_from, effective_to, changed_by, change_reason) VALUES
+(1, 1400.00, 750.00, 1100.00, '2025-01-01 00:00:00', '2025-06-01 00:00:00', 1, 'Initial pricing'),
+(1, 1500.00, 800.00, 1200.00, '2025-06-01 00:00:00', NULL, 1, 'Price increase'),
+(2, 999.00, 450.00, 750.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing'),
+(3, 2499.00, 1200.00, 1999.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing'),
+(4, 599.00, 250.00, 450.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing'),
+(5, 1299.00, 600.00, 999.00, '2025-01-01 00:00:00', NULL, 1, 'Initial pricing');
 
-INSERT INTO student_products (student_id, product_id, price_history_id, quantity, unit_cost_price, unit_selling_price, total_amount, purchase_date, payment_mode, recorded_by) VALUES
-(1, 1, 1, 1, 750.00, 1100.00, 1100.00, '2025-04-10', 'cash', 1),
-(1, 2, 3, 2, 450.00, 750.00, 1500.00, '2025-04-10', 'upi', 1),
-(3, 1, 2, 1, 800.00, 1200.00, 1200.00, '2025-07-15', 'upi', 1),
-(4, 3, 4, 1, 1200.00, 1999.00, 1999.00, '2025-07-20', 'card', 1);
+INSERT INTO student_products (student_id, product_id, price_history_id, quantity, unit_mrp, unit_cost_price, unit_selling_price, total_amount, purchase_date, payment_mode, recorded_by) VALUES
+(1, 1, 1, 1, 1400.00, 750.00, 1100.00, 1100.00, '2025-04-10', 'cash', 1),
+(1, 2, 3, 2, 999.00, 450.00, 750.00, 1500.00, '2025-04-10', 'upi', 1),
+(3, 1, 2, 1, 1500.00, 800.00, 1200.00, 1200.00, '2025-07-15', 'upi', 1),
+(4, 3, 4, 1, 2499.00, 1200.00, 1999.00, 1999.00, '2025-07-20', 'card', 1);
 
 INSERT INTO admissions (first_name, last_name, email, phone, city, state, batch_id, status) VALUES
 ('Kavya', 'Nair', 'kavya@email.com', '9900220022', 'Mumbai', 'Maharashtra', 3, 'pending'),

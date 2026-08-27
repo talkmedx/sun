@@ -109,6 +109,7 @@ export const productSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional().nullable(),
   vendor_id: z.coerce.number().int().positive().optional().nullable(),
+  mrp: z.coerce.number().min(0),
   cost_price: z.coerce.number().min(0),
   selling_price: z.coerce.number().min(0),
   quantity_available: z.coerce.number().int().min(0).optional(),
