@@ -35,11 +35,14 @@ export function Sidebar() {
   const role = useAuthStore((s) => s.user?.role) || 'super_admin';
   const allowed = ROLE_NAV[role] || ROLE_NAV.super_admin;
   const nav = navItems.filter((item) => allowed.includes(item.key));
+  const canSeeAdmissions = allowed.includes('admissions');
 
+  // Badge count only — fetch once when admissions is in nav; mutations invalidate this key
   const { data: pendingAdmissionsData } = useQuery({
     queryKey: ['pending-admissions-count'],
     queryFn: async () => (await admissionsApi.list({ status: 'pending', limit: 1 })).data,
-    refetchInterval: 10000,
+    enabled: canSeeAdmissions,
+    staleTime: 60_000,
   });
   const pendingCount = pendingAdmissionsData?.meta?.total ?? 0;
 
